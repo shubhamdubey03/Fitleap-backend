@@ -1,0 +1,36 @@
+[
+  {
+    "id": "1770193750935",
+    "name": "Test User",
+    "email": "test@example.com",
+    "password": "$2b$10$POsPVg7a.0uwah3k29VpX.Uin9SP8v.GnGwP.yxUgwAtDlxPWQryW",
+    "role": "user",
+    "phone": "9876543210"
+  },
+  {
+    "id": "1770193912065",
+    "name": "Shubham",
+    "email": "shubh@example.com",
+    "password": "$2b$10$34ecjNfvzAyo.gKSh9QMceCeKOhUxaZmBLQGjvcWkQn9eVQB7iX5a",
+    "role": "user",
+    "phone": "9876543210"
+  },
+  {
+    "id": "1770203669593",
+    "name": "shubham.dubeyargos",
+    "email": "shubham.dubeyargos@gmail.com",
+    "password": "$2b$10$4XxOrvbBCD3gDAiOUK6dlueJGNJPaRIf5FzauDY0KAULyzdU3x34K",
+    "role": "user",
+    "phone": "9956335206",
+    "countryCode": "IN"
+  },
+  {
+    "id": "1770203685255",
+    "name": "shubham.dubey",
+    "email": "shubham.dubey@gmail.com",
+    "password": "$2b$10$sAweVXnuMjlt88rDFQEbxOxPV5ZakBL.2E/2qpA4fa9A7v/r2FuPi",
+    "role": "user",
+    "phone": "9956335206",
+    "countryCode": "IN"
+  }
+]
