@@ -250,64 +250,285 @@ const login = async (req, res) => {
     }
 };
 
-// @desc    Google Login
+// Helper to handle user retrieval or creation for Google Sign-In
+const findOrCreateUser = async (name, email) => {
+    // 1. Optimize: Select only necessary fields
+    let { data: user } = await supabase
+        .from('users')
+        .select('id, name, email, role')
+        .eq('email', email)
+        .maybeSingle();
+
+    if (user) return { ...user, isNewUser: false };
+
+    // 2. Create User if not found
+    // Optimize: Use random password and random phone to avoid unique constraints if any
+    const randomPassword = await bcrypt.hash(Math.random().toString(36), 10);
+    const randomPhone = Math.floor(1000000000 + Math.random() * 9000000000).toString(); // Random 10 digit
+
+    const { data: newUser, error } = await supabase
+        .from('users')
+        .insert([{
+            name,
+            email,
+            password: randomPassword,
+            role: 'User',
+            phone: randomPhone,
+            country_code: '+91'
+        }])
+        .select('id, name, email, role')
+        .single();
+
+    if (error) throw error;
+    return { ...newUser, isNewUser: true };
+};
+
+// @desc    Google Login (ID Token)
 // @route   POST /api/auth/google
 // @access  Public
+// const googleLogin = async (req, res) => {
+//     try {
+//         const { idToken } = req.body;
+//         const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+//         const ticket = await client.verifyIdToken({
+//             idToken,
+//             audience: process.env.GOOGLE_CLIENT_ID,
+//         });
+
+//         const { name, email } = ticket.getPayload();
+//         const user = await findOrCreateUser(name, email);
+
+//         res.status(200).json({ ...user, token: generateToken(user.id) });
+
+//     } catch (error) {
+//         console.error("Google Login Error:", error);
+//         res.status(401).json({ message: `Google Authentication Failed: ${error.message}`, error: error.message });
+//     }
+// };
+
 const googleLogin = async (req, res) => {
     try {
         const { idToken } = req.body;
+
+        console.log("📩 Google ID Token received");
+
         const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-        console.log('Using Google Client ID:', process.env.GOOGLE_CLIENT_ID);
 
         const ticket = await client.verifyIdToken({
             idToken,
             audience: process.env.GOOGLE_CLIENT_ID,
         });
 
-        const { name, email, picture } = ticket.getPayload();
+        const payload = ticket.getPayload();
 
-        // Check if user exists
-        let { data: user, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', email)
-            .single();
+        console.log("✅ Google Payload:", {
+            name: payload.name,
+            email: payload.email,
+            picture: payload.picture,
+        });
 
-        if (!user) {
-            // Create new user if not exists
-            const { data: newUser, error: createError } = await supabase
-                .from('users')
-                .insert([{
-                    name,
-                    email,
-                    password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10), // Random password
-                    role: 'User', // Default role for Google Login
-                    // profile_pic: picture // Add if schema supports it
-                }])
-                .select()
-                .single();
+        const { name, email } = payload;
 
-            if (createError) throw createError;
-            user = newUser;
-        }
+        const user = await findOrCreateUser(name, email);
+
+        console.log("👤 User from DB:", user);
 
         res.status(200).json({
-            _id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            token: generateToken(user.id),
+            ...user,
+            token: generateToken(user.id)
         });
 
     } catch (error) {
-        console.error("Google Login Error:", error);
-        res.status(401).json({ message: 'Google Authentication Failed', error: error.message });
+        console.error("❌ Google Login Error:", error.message);
+        res.status(401).json({
+            message: "Google Authentication Failed",
+            error: error.message
+        });
     }
 };
+
+
+// @desc    Google Login (Simple - Email & Name)
+// @route   POST /api/auth/google-simple
+// @access  Public
+const googleLoginSimple = async (req, res) => {
+    try {
+        const { email, name } = req.body;
+
+        if (!email || !name) {
+            return res.status(400).json({ message: 'Email and Name are required' });
+        }
+
+        const user = await findOrCreateUser(name, email);
+        res.status(200).json({ ...user, token: generateToken(user.id) });
+
+    } catch (error) {
+        console.error("Google Simple Login Error:", error);
+        res.status(500).json({ message: 'Server Error', error: error.message });
+    }
+};
+
+// @desc    Update User Profile
+// @route   PUT /api/auth/update-profile
+// @access  Private
+const updateUserProfile = async (req, res) => {
+    try {
+        const { name, phone, gender, age, bio, location, website } = req.body;
+        const userId = req.user.id; // Get ID from protected middleware
+
+        if (!userId) {
+            return res.status(400).json({ message: 'User not found in token' });
+        }
+
+        const updates = {};
+        if (name !== undefined) updates.name = name;
+        if (phone !== undefined) updates.phone = phone;
+        if (gender !== undefined) updates.gender = gender;
+        if (age !== undefined) updates.age = age;
+        if (bio !== undefined) updates.bio = bio;
+        if (location !== undefined) updates.location = location;
+        if (website !== undefined) updates.website = website;
+
+        // Handle File Upload (Profile Image)
+        if (req.file) {
+            const fileName = `${Date.now()}_${req.file.originalname}`;
+            const { data, error } = await supabase.storage
+                .from('profile_image') // Use correct bucket name
+                .upload(`${userId}/${fileName}`, req.file.buffer, {
+                    contentType: req.file.mimetype,
+                    upsert: true
+                });
+
+            if (error) {
+                console.error('Supabase Storage Error:', error);
+                // Continue? Or error? Let's log but continue update metadata if possible,
+                // or fail. Failing is safer.
+                throw new Error('Image upload failed: ' + error.message);
+            }
+
+            const { data: publicData } = supabase.storage
+                .from('profile_image')
+                .getPublicUrl(`${userId}/${fileName}`);
+
+            if (publicData) {
+                updates.profile_image = publicData.publicUrl;
+            }
+        }
+
+        const { data: updatedUser, error } = await supabase
+            .from('users')
+            .update(updates)
+            .eq('id', userId)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Update Profile Error:', error);
+            return res.status(400).json({ message: 'Update failed', error: error.message });
+        }
+
+        res.status(200).json(updatedUser);
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error', error: error.message });
+    }
+};
+
+// @desc    Get User Profile
+// @route   GET /api/auth/profile
+// @access  Private (Requires token)
+const getUserProfile = async (req, res) => {
+    try {
+        const user = req.user; // Attached by protect middleware
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.status(200).json(user);
+    } catch (error) {
+        console.error("Get Profile Error:", error);
+        res.status(500).json({ message: 'Server Error', error: error.message });
+    }
+};
+
+// @desc    Update Profile Image
+// @route   PUT /api/auth/update-image
+// @access  Private
+const updateProfileImage = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No image file uploaded' });
+        }
+
+        const userId = req.user.id;
+        const fileName = `${Date.now()}_${req.file.originalname}`;
+
+        // DEBUGGING: List all buckets to check availability
+        // const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+        // if (buckets) {
+        //     console.log('Available Buckets:', buckets.map(b => b.name));
+        //     const bucketExists = buckets.find(b => b.name === 'profile_image');
+        //     console.log("Does 'profile_image' bucket exist?", !!bucketExists);
+        // } else {
+        //     console.error('Error listing buckets:', bucketsError);
+        // }
+
+        // console.log(`Attempting upload to 'profile_image' for User: ${userId}, File: ${fileName}`);
+
+        // ✅ Upload to correct Supabase bucket
+        const { error: uploadError } = await supabase.storage
+            .from('profile_image')
+            .upload(`${userId}/${fileName}`, req.file.buffer, {
+                contentType: req.file.mimetype,
+                upsert: true
+            });
+
+        if (uploadError) {
+            return res.status(400).json({ message: uploadError.message });
+        }
+
+        // ✅ Get public URL
+        const { data: publicData } = supabase.storage
+            .from('profile_image')
+            .getPublicUrl(`${userId}/${fileName}`);
+
+        const imageUrl = publicData.publicUrl;
+
+        // ✅ Save in users table
+        const { data: updatedUser, error } = await supabase
+            .from('users')
+            .update({ profile_image: imageUrl })
+            .eq('id', userId)
+            .select()
+            .single();
+
+        if (error) {
+            return res.status(400).json({ message: error.message });
+        }
+
+        res.json({
+            message: "Profile image updated",
+            profile_image: imageUrl,
+            user: updatedUser
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 
 module.exports = {
     signupUser,
     signup,
     login,
     googleLogin,
+    googleLoginSimple,
+    updateUserProfile,
+    getUserProfile,
+    updateProfileImage,
 };

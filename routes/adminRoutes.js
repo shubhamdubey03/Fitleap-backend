@@ -5,6 +5,7 @@ const { getPendingCoaches, approveCoach, getApprovedCoaches, getAllUsers } = req
 router.get('/pending-coaches', getPendingCoaches);
 router.get('/coaches', getApprovedCoaches);
 router.get('/users', getAllUsers);
+// Revert to original
 router.put('/approve-coach/:id', approveCoach);
 
 module.exports = router;

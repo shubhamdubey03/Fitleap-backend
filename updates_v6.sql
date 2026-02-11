@@ -1,0 +1,8 @@
+-- Add missing profile columns to users table
+ALTER TABLE public.users 
+ADD COLUMN IF NOT EXISTS profile_image TEXT,
+ADD COLUMN IF NOT EXISTS gender TEXT,
+ADD COLUMN IF NOT EXISTS age INTEGER,
+ADD COLUMN IF NOT EXISTS bio TEXT,
+ADD COLUMN IF NOT EXISTS location TEXT,
+ADD COLUMN IF NOT EXISTS website TEXT;
