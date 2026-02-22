@@ -21,7 +21,6 @@ const protect = async (req, res, next) => {
                 .select('*') // Select all or necessary fields
                 .eq('id', decoded.id)
                 .single();
-
             if (error || !user) {
                 return res.status(401).json({ message: 'Not authorized, user not found' });
             }

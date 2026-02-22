@@ -18,8 +18,8 @@ const signupUser = async (req, res) => {
         const { name, email, password, mobile, countryCode } = req.body;
 
         // Validation
-        if (!name || !email || !password || !mobile) {
-            return res.status(400).json({ message: 'Please add all fields' });
+        if (!name || !email || !password || !mobile || !countryCode) {
+            return res.status(400).json({ message: 'Please add all fields, including countryCode' });
         }
 
         // Check if user exists
@@ -27,7 +27,7 @@ const signupUser = async (req, res) => {
             .from('users')
             .select('email')
             .eq('email', email)
-            .single();
+            .maybeSingle();
 
         if (userExists) {
             return res.status(400).json({ message: 'User already exists' });
@@ -64,6 +64,7 @@ const signupUser = async (req, res) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                is_premium: user.is_premium || false,
                 token: generateToken(user.id),
             });
         } else {
@@ -80,8 +81,8 @@ const signupUser = async (req, res) => {
 // @access  Public
 const signup = async (req, res) => {
     try {
-        console.log('Signup Request Body:', req.body);
-        console.log('Signup Request Files:', req.files ? Object.keys(req.files) : 'No files');
+        console.log('Signup Body:', req.body);
+        console.log('Files:', req.files ? Object.keys(req.files) : 'No files');
 
         const {
             name,
@@ -94,112 +95,104 @@ const signup = async (req, res) => {
             ifscCode,
         } = req.body;
 
-        // Validation
+        // ✅ Validation
         if (!name || !email || !mobile || !password || !countryCode || !bankName || !bankAccNo || !ifscCode) {
-            return res.status(400).json({ message: 'Please add all required fields' });
+            return res.status(400).json({ message: 'All fields are required' });
         }
 
-        // Check if user exists
-        const { data: userExists, error: userExistsError } = await supabase
+        // ✅ Safe email check (NO crash)
+        const { data: existingUser } = await supabase
             .from('users')
-            .select('email')
+            .select('id')
             .eq('email', email)
-            .single();
+            .maybeSingle();
 
-        if (userExists) {
+        if (existingUser) {
             return res.status(400).json({ message: 'User already exists' });
         }
 
-        // Hash password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
+        // 🔐 Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Handle File Uploads
-        const uploadFile = async (file, path) => {
+        // 📤 Upload helper
+        const uploadFile = async (file, folder) => {
             if (!file) return null;
-            const fileName = `${Date.now()}_${file.originalname}`;
-            const { data, error } = await supabase.storage
-                .from('documents') // Ensure this bucket exists
-                .upload(`${path}/${fileName}`, file.buffer, {
-                    contentType: file.mimetype,
-                });
+
+            const ext = file.originalname.split('.').pop();
+            const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+            const { error } = await supabase.storage
+                .from('documents')
+                .upload(fileName, file.buffer, { contentType: file.mimetype });
+
             if (error) throw error;
-            return supabase.storage.from('documents').getPublicUrl(`${path}/${fileName}`).data.publicUrl;
+
+            return supabase.storage.from('documents').getPublicUrl(fileName).data.publicUrl;
         };
 
-        let nutritionUrl = null;
-        let aadharCardUrl = null;
-        let panCardUrl = null;
+        // 📎 Upload docs
+        const nutritionUrl = req.files?.nutrition
+            ? await uploadFile(req.files.nutrition[0], 'nutrition')
+            : null;
 
-        if (req.files) {
-            if (req.files.nutrition) nutritionUrl = await uploadFile(req.files.nutrition[0], 'nutrition');
-            if (req.files.aadharCard) aadharCardUrl = await uploadFile(req.files.aadharCard[0], 'identity');
-            if (req.files.panCard) panCardUrl = await uploadFile(req.files.panCard[0], 'identity');
-        }
+        const aadharCardUrl = req.files?.aadharCard
+            ? await uploadFile(req.files.aadharCard[0], 'identity')
+            : null;
 
-        // Create user (Auth)
-        const { data: user, error: createError } = await supabase
+        const panCardUrl = req.files?.panCard
+            ? await uploadFile(req.files.panCard[0], 'identity')
+            : null;
+
+        // 👤 Create user
+        const { data: user, error: userErr } = await supabase
             .from('users')
-            .insert([
-                {
-                    name,
-                    email,
-                    password: hashedPassword,
-                    phone: mobile,
-                    country_code: countryCode,
-                    role: 'Coach',
-                },
-            ])
+            .insert([{
+                name,
+                email,
+                password: hashedPassword,
+                phone: mobile,
+                country_code: countryCode,
+                role: 'Coach',
+            }])
             .select()
             .single();
+        console.log("User created successfulldddy", user);
+        if (userErr) throw userErr;
 
-        if (createError) {
-            console.error('Supabase Signup Error (User):', createError);
-            return res.status(400).json({ message: 'Invalid user data', error: createError.message });
+        // 📋 Create coach profile (PENDING)
+        const { error: coachErr } = await supabase
+            .from('coaches')
+            .insert([{
+                user_id: user.id,
+                bank_name: bankName,
+                bank_acc_no: bankAccNo,
+                ifsc_code: ifscCode,
+                nutrition_url: nutritionUrl,
+                aadhar_card_url: aadharCardUrl,
+                pan_card_url: panCardUrl,
+                is_approved: false,
+            }]);
+
+        if (coachErr) {
+            // 🔁 rollback user if coach insert fails
+            await supabase.from('users').delete().eq('id', user.id);
+            throw coachErr;
         }
 
-        if (user) {
-            // Create Coach Profile
-            const { error: coachError } = await supabase
-                .from('coaches')
-                .insert([
-                    {
-                        user_id: user.id,
-                        bank_name: bankName,
-                        bank_acc_no: bankAccNo,
-                        ifsc_code: ifscCode,
-                        nutrition_url: nutritionUrl,
-                        aadhar_card_url: aadharCardUrl,
-                        pan_card_url: panCardUrl,
-                        is_approved: false // Pending by default
-                    }
-                ]);
+        // ✅ IMPORTANT: no token returned (Frontend expects redirect to Login)
+        res.status(201).json({
+            message: 'Application Submitted! Your account is awaiting Admin approval. You will be able to login once approved.',
+            userId: user.id,
+            email: user.email,
+            role: user.role,
+        });
 
-            if (coachError) {
-                console.error('Supabase Signup Error (Coach):', coachError);
-                // Optional: Delete user if coach profile fails to maintain consistency
-                await supabase.from('users').delete().eq('id', user.id);
-                return res.status(400).json({ message: 'Failed to create coach profile', error: coachError.message });
-            }
-
-            // For Coaches, DO NOT return token. Return pending message.
-            res.status(201).json({
-                message: 'Application submitted successfully. Please wait for Admin approval to login.',
-                _id: user.id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                // No token
-            });
-        } else {
-            res.status(400).json({ message: 'Invalid user data' });
-        }
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error', error: error.message });
+    } catch (err) {
+        console.error('Signup Error:', err);
+        res.status(500).json({ message: err.message });
     }
 };
+
 
 // @desc    Authenticate a user
 // @route   POST /api/auth/login
@@ -208,58 +201,82 @@ const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Check for user email
-        const { data: user, error } = await supabase
+        const { data: user } = await supabase
             .from('users')
             .select('*')
             .eq('email', email)
             .single();
 
-        if (user && (await bcrypt.compare(password, user.password))) {
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
 
-            // Check Approval for Coaches
-            if (user.role === 'Coach') {
-                const { data: coachData, error: coachError } = await supabase
-                    .from('coaches')
-                    .select('is_approved')
-                    .eq('user_id', user.id)
-                    .single();
+        const match = await bcrypt.compare(password, user.password);
+        if (!match) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
 
-                if (coachError || !coachData) {
-                    return res.status(403).json({ message: 'Coach profile not found or error fetching status.' });
-                }
+        if (user.role === 'Coach') {
 
-                if (!coachData.is_approved) {
-                    return res.status(403).json({ message: 'Your account is pending approval. Please contact Admin.' });
-                }
+            const { data: coach, error: coachError } = await supabase
+                .from('coaches')
+                .select('is_approved')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (coachError || !coach) {
+                return res.status(403).json({
+                    message: 'Coach profile not found'
+                });
             }
 
-            res.json({
-                _id: user.id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                token: generateToken(user.id),
-            });
-        } else {
-            res.status(401).json({ message: 'Invalid credentials' });
+            if (coach.is_approved === false) {
+                return res.status(403).json({
+                    message: 'Your account is pending admin approval'
+                });
+            }
         }
+
+        console.log("Login Successful, generating token.");
+        res.json({
+            _id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            is_premium: user.is_premium || false,
+            token: generateToken(user.id),
+        });
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error' });
     }
 };
 
+
 // Helper to handle user retrieval or creation for Google Sign-In
-const findOrCreateUser = async (name, email) => {
+const findOrCreateUser = async (name, email, picture) => {
     // 1. Optimize: Select only necessary fields
     let { data: user } = await supabase
         .from('users')
-        .select('id, name, email, role')
+        .select('id, name, email, role, profile_image, is_premium')
         .eq('email', email)
         .maybeSingle();
 
-    if (user) return { ...user, isNewUser: false };
+    if (user) {
+        // Update profile picture if missing or update always to sync with Google
+        if (picture && !user.profile_image) {
+            const { error: updateError } = await supabase
+                .from('users')
+                .update({ profile_image: picture })
+                .eq('id', user.id);
+
+            if (!updateError) {
+                user.profile_image = picture;
+            }
+        }
+        return { ...user, isNewUser: false };
+    }
 
     // 2. Create User if not found
     // Optimize: Use random password and random phone to avoid unique constraints if any
@@ -274,9 +291,10 @@ const findOrCreateUser = async (name, email) => {
             password: randomPassword,
             role: 'User',
             phone: randomPhone,
-            country_code: '+91'
+            country_code: '+91',
+            profile_image: picture // Save Google Profile Picture
         }])
-        .select('id, name, email, role')
+        .select('id, name, email, role, profile_image, is_premium')
         .single();
 
     if (error) throw error;
@@ -330,7 +348,7 @@ const googleLogin = async (req, res) => {
 
         const { name, email } = payload;
 
-        const user = await findOrCreateUser(name, email);
+        const user = await findOrCreateUser(name, email, payload.picture);
 
         console.log("👤 User from DB:", user);
 

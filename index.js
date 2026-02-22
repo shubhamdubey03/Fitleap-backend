@@ -1,8 +1,17 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-
 dotenv.config();
+const path = require('path');
+
+const rewardRoutes = require('./routes/rewardRoutes');
+const walletRoutes = require('./routes/walletRoutes');
+const orderRoutes = require("./routes/orderRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
+const feedbackRoutes = require('./routes/feedbackRoutes');
+const locationRoutes = require('./routes/location');
+const invoiceRoutes = require('./routes/invoiceRoutes');
+const stateRoutes = require('./routes/stateRoute/stateRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,8 +25,19 @@ app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
 });
-
+app.use('/invoices', express.static(path.join(__dirname, 'invoices')));
+app.use('/api/invoice', invoiceRoutes);
+app.use('/api', feedbackRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use('/api/rewards', rewardRoutes);
+app.use('/api/wallet', walletRoutes);
+app.use('/api', locationRoutes);
+app.use('/api', stateRoutes);
+app.use('/api/products', require('./routes/productRoutes'));
 const authRoutes = require('./routes/authRoutes');
+app.use('/api/vendors', require('./routes/vendorRoute/vendorRoutes'));
+
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', require('./routes/adminRoutes'));

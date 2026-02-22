@@ -11,6 +11,25 @@ const sendMessage = async (req, res) => {
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
+        // Check for Premium Status
+        const { data: sender, error: senderError } = await supabase
+            .from('users')
+            .select('role, is_premium')
+            .eq('id', senderId)
+            .single();
+
+        if (senderError || !sender) {
+            return res.status(404).json({ message: 'Sender not found' });
+        }
+
+        // Only enforce premium for regular 'User' role
+        if (sender.role === 'User' && !sender.is_premium) {
+            return res.status(403).json({
+                message: 'Premium subscription required to chat with coaches',
+                requiresPremium: true
+            });
+        }
+
         const { data, error } = await supabase
             .from('messages')
             .insert([{ sender_id: senderId, receiver_id: receiverId, message }])
