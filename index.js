@@ -4,8 +4,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 const path = require('path');
 
-const rewardRoutes = require('./routes/rewardRoutes');
-const walletRoutes = require('./routes/walletRoutes');
+
 const orderRoutes = require("./routes/orderRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const feedbackRoutes = require('./routes/feedbackRoutes');
@@ -30,8 +29,6 @@ app.use('/api/invoice', invoiceRoutes);
 app.use('/api', feedbackRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
-app.use('/api/rewards', rewardRoutes);
-app.use('/api/wallet', walletRoutes);
 app.use('/api', locationRoutes);
 app.use('/api', stateRoutes);
 app.use('/api/products', require('./routes/productRoutes'));

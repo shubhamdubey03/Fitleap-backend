@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { signup, login, googleLogin, signupUser } = require('../controllers/authController');
-const { forgotPassword, resetPassword } = require('../controllers/forgetpassController');
+const { forgotPassword, verifyResetToken } = require('../forgetPassword/forgetpassController');
+const { resetPassword } = require('../forgetPassword/resetPassword');
 
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
@@ -17,7 +18,8 @@ router.post('/signup', upload.fields([
 router.post('/login', login);
 router.post('/google', googleLogin);
 router.post('/forgot-password', forgotPassword);
-router.post('/reset-password/:token', resetPassword);
+router.post('/verify-reset-token', verifyResetToken);
+router.post('/reset-password', resetPassword);
 router.post('/google-simple', require('../controllers/authController').googleLoginSimple);
 router.put('/update-profile', protect, upload.single('profileImage'), require('../controllers/authController').updateUserProfile);
 router.get('/profile', protect, require('../controllers/authController').getUserProfile);

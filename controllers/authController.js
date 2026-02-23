@@ -2,6 +2,7 @@ const supabase = require('../config/supabase');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
+const { updateReward } = require('./reward/rewardController');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -17,16 +18,38 @@ const signupUser = async (req, res) => {
     try {
         const { name, email, password, mobile, countryCode } = req.body;
 
-        // Validation
-        if (!name || !email || !password || !mobile || !countryCode) {
+        // Trim and Validate
+        const trimmedName = name?.trim();
+        const trimmedEmail = email?.trim().toLowerCase();
+        const trimmedPassword = password?.trim();
+        const trimmedMobile = mobile?.trim();
+        const trimmedCountryCode = countryCode?.trim();
+
+        if (!trimmedName || !trimmedEmail || !trimmedPassword || !trimmedMobile || !trimmedCountryCode) {
             return res.status(400).json({ message: 'Please add all fields, including countryCode' });
+        }
+
+        // Email Validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmedEmail)) {
+            return res.status(400).json({ message: 'Please provide a valid email address' });
+        }
+
+        // Phone Validation (simple length check)
+        if (trimmedMobile.length < 10) {
+            return res.status(400).json({ message: 'Please provide a valid mobile number' });
+        }
+
+        // Password Validation
+        if (trimmedPassword.length < 8) {
+            return res.status(400).json({ message: 'Password must be at least 8 characters long' });
         }
 
         // Check if user exists
         const { data: userExists, error: userExistsError } = await supabase
             .from('users')
             .select('email')
-            .eq('email', email)
+            .eq('email', trimmedEmail)
             .maybeSingle();
 
         if (userExists) {
@@ -42,11 +65,11 @@ const signupUser = async (req, res) => {
             .from('users')
             .insert([
                 {
-                    name,
-                    email,
+                    name: trimmedName,
+                    email: trimmedEmail,
                     password: hashedPassword,
-                    phone: mobile,
-                    country_code: countryCode,
+                    phone: trimmedMobile,
+                    country_code: trimmedCountryCode,
                     role: 'User',
                 },
             ])
@@ -57,6 +80,9 @@ const signupUser = async (req, res) => {
             console.error('Supabase Signup Error:', createError);
             return res.status(400).json({ message: 'Invalid user data', error: createError.message });
         }
+
+        // updating user wallet
+        await updateReward(user.id, 'signup')
 
         if (user) {
             res.status(201).json({
@@ -75,6 +101,8 @@ const signupUser = async (req, res) => {
         res.status(500).json({ message: 'Server Error', error: error.message, stack: error.stack });
     }
 };
+
+
 
 // @desc    Register a new coach/vendor
 // @route   POST /api/auth/signup
@@ -95,16 +123,37 @@ const signup = async (req, res) => {
             ifscCode,
         } = req.body;
 
-        // ✅ Validation
-        if (!name || !email || !mobile || !password || !countryCode || !bankName || !bankAccNo || !ifscCode) {
+        // Trim and Validate
+        const tName = name?.trim();
+        const tEmail = email?.trim().toLowerCase();
+        const tMobile = mobile?.trim();
+        const tPassword = password?.trim();
+        const tBankName = bankName?.trim();
+        const tBankAccNo = bankAccNo?.trim();
+        const tIfscCode = ifscCode?.trim();
+
+        if (!tName || !tEmail || !tMobile || !tPassword || !countryCode || !tBankName || !tBankAccNo || !tIfscCode) {
             return res.status(400).json({ message: 'All fields are required' });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(tEmail)) {
+            return res.status(400).json({ message: 'Please provide a valid email address' });
+        }
+
+        if (tMobile.length < 10) {
+            return res.status(400).json({ message: 'Please provide a valid mobile number' });
+        }
+
+        if (tPassword.length < 8) {
+            return res.status(400).json({ message: 'Password must be at least 8 characters long' });
         }
 
         // ✅ Safe email check (NO crash)
         const { data: existingUser } = await supabase
             .from('users')
             .select('id')
-            .eq('email', email)
+            .eq('email', tEmail)
             .maybeSingle();
 
         if (existingUser) {
@@ -112,7 +161,7 @@ const signup = async (req, res) => {
         }
 
         // 🔐 Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(tPassword, 10);
 
         // 📤 Upload helper
         const uploadFile = async (file, folder) => {
@@ -147,10 +196,10 @@ const signup = async (req, res) => {
         const { data: user, error: userErr } = await supabase
             .from('users')
             .insert([{
-                name,
-                email,
+                name: tName,
+                email: tEmail,
                 password: hashedPassword,
-                phone: mobile,
+                phone: tMobile,
                 country_code: countryCode,
                 role: 'Coach',
             }])
@@ -164,9 +213,9 @@ const signup = async (req, res) => {
             .from('coaches')
             .insert([{
                 user_id: user.id,
-                bank_name: bankName,
-                bank_acc_no: bankAccNo,
-                ifsc_code: ifscCode,
+                bank_name: tBankName,
+                bank_acc_no: tBankAccNo,
+                ifsc_code: tIfscCode,
                 nutrition_url: nutritionUrl,
                 aadhar_card_url: aadharCardUrl,
                 pan_card_url: panCardUrl,
@@ -200,11 +249,12 @@ const signup = async (req, res) => {
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
+        const trimmedEmail = email?.trim().toLowerCase();
 
         const { data: user } = await supabase
             .from('users')
             .select('*')
-            .eq('email', email)
+            .eq('email', trimmedEmail)
             .single();
 
         if (!user) {
