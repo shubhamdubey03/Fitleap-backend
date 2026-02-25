@@ -68,6 +68,31 @@ exports.getOne = async (req, res) => {
     if (error) return res.status(400).json({ error: error.message });
     res.json(data);
 };
+exports.getCoachAppointments = async (req, res) => {
+    const coach_id = req.user.id;
+
+    const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+            id,
+            appointment_date,
+            start_time,
+            status,
+            channel_name,
+            agora_token,
+            user:user_id (
+                id,
+                name,
+                email
+            )
+        `)
+        .eq('coach_id', coach_id)
+        .order('appointment_date', { ascending: true });
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    res.json(data);
+};
 
 exports.accept = async (req, res) => {
     const coach_id = req.user.id;
@@ -77,6 +102,7 @@ exports.accept = async (req, res) => {
 
     const channel = "appointment_" + crypto.randomBytes(4).toString('hex');
     const token = generateToken(channel);
+    console.log("TOKEN:", token);
 
     const { data, error } = await supabase
         .from('appointments')
