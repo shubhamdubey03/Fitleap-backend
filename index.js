@@ -40,6 +40,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/v1/subscriptions', require('./routes/agoraRoutes/subscriptions.routes'));
+app.use('/api/v1', require('./routes/agoraRoutes/availability.routes'));
+app.use('/api/v1', require('./routes/agoraRoutes/slots.routes'));
+app.use('/api/v1/appointments', require('./routes/agoraRoutes/appointments.routes'));
 
 
 app.get('/', (req, res) => {

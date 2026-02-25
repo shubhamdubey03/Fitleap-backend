@@ -4,6 +4,7 @@ const path = require('path');
 
 async function pdfGenerator(order, filePath) {
     console.log(";;;;;;;;;;", order)
+    console.log("PRODUCTS =>", order.product_id);
     return new Promise((resolve, reject) => {
 
         const dir = path.dirname(filePath);
@@ -21,7 +22,7 @@ async function pdfGenerator(order, filePath) {
         doc.text(`Date: ${new Date(order.created_at).toDateString()}`);
         doc.moveDown();
 
-        doc.text("Items:");
+        doc.text(`Items: ${order.products.name}`);
 
         // order.items.forEach(item => {
         //     doc.text(`${item.product.name} x${item.qty} - ₹${item.price}`);

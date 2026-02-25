@@ -10,13 +10,36 @@ const generateToken = (id) => {
         expiresIn: '30d',
     });
 };
+const crypto = require('crypto');
+
+const generateReferralCode = () => {
+    return crypto.randomBytes(4).toString('hex').toUpperCase();
+};
+const getUniqueReferralCode = async () => {
+    let code;
+    let exists = true;
+
+    while (exists) {
+        code = generateReferralCode();
+
+        const { data } = await supabase
+            .from('users')
+            .select('id')
+            .eq('referral_code', code)
+            .maybeSingle();
+
+        if (!data) exists = false;
+    }
+
+    return code;
+};
 
 // @desc    Register a new user (Standard Signup)
 // @route   POST /api/auth/signup-user
 // @access  Public
 const signupUser = async (req, res) => {
     try {
-        const { name, email, password, mobile, countryCode } = req.body;
+        const { name, email, password, mobile, countryCode, referralByCode } = req.body;
 
         // Trim and Validate
         const trimmedName = name?.trim();
@@ -59,7 +82,7 @@ const signupUser = async (req, res) => {
         // Hash password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-
+        const referralCode = await getUniqueReferralCode();
         // Create user
         const { data: user, error: createError } = await supabase
             .from('users')
@@ -71,6 +94,8 @@ const signupUser = async (req, res) => {
                     phone: trimmedMobile,
                     country_code: trimmedCountryCode,
                     role: 'User',
+                    referral_code: referralCode,
+                    wallet_balance: 0
                 },
             ])
             .select()
@@ -84,11 +109,39 @@ const signupUser = async (req, res) => {
         // updating user wallet
         await updateReward(user.id, 'signup')
 
+        if (referralByCode) {
+
+            const { data: referrer } = await supabase
+                .from('users')
+                .select('*')
+                .eq('referral_code', referralByCode)
+                .maybeSingle();
+
+
+            if (referrer && referrer.id !== user.id) {
+
+
+                // store referral record
+                await supabase.from('referrals').insert([{
+                    referred_by: referrer.id,
+                    referred_to: user.id,
+                    coins: 10, // you already track coins via transaction table
+                    status: 'completed'
+                }]);
+                const newBalance = referrer.wallet_balance + 10;
+                const { error: walletError } = await supabase
+                    .from('users')
+                    .update({ wallet_balance: newBalance })
+                    .eq('id', referrer.id);
+            }
+        }
+
         if (user) {
             res.status(201).json({
                 _id: user.id,
                 name: user.name,
                 email: user.email,
+                referral_code: user.referral_code,
                 role: user.role,
                 is_premium: user.is_premium || false,
                 token: generateToken(user.id),
@@ -302,6 +355,7 @@ const login = async (req, res) => {
         res.status(500).json({ message: 'Server Error' });
     }
 };
+console.log("SIGN SECRET:", process.env.JWT_SECRET);
 
 
 // Helper to handle user retrieval or creation for Google Sign-In

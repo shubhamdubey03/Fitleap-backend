@@ -2,6 +2,7 @@ const { razorpay } = require('../config/razorpay');
 const crypto = require('crypto');
 const supabase = require('../config/supabase');
 const { pdfGenerator } = require('../utils/pdfGenerator');
+const { updateReward } = require('./reward/rewardController');
 
 const createPaymentOrder = async (req, res) => {
     try {
@@ -134,10 +135,22 @@ const verifyPayment = async (req, res) => {
         // fetching order details
         const { data: order, error: orderError } = await supabase
             .from("orders")
-            .select("*")
+            .select(`
+                *,
+                products: product_id(*)
+            `)
             .eq("id", orderId)
             .single();
 
+        if (!order.reward_given) {
+            await updateReward(order.user_id, 'market', order.total_price);
+
+            await supabase
+                .from('orders')
+                .update({ reward_given: true })
+                .eq('id', order.id);
+        }
+        console.log("orderqqqqqqqqqqqqqq", order);
 
         const fileName = `invoice-${order.id}.pdf`;
         const filePath = require('path').join(__dirname, '../invoices', fileName);

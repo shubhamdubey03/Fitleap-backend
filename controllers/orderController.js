@@ -1,46 +1,5 @@
 const supabase = require('../config/supabase');
 
-// const createOrder = async (req, res) => {
-//     try {
-//         const user_id = req.user.id;
-//         const { items, total_amount } = req.body;
-
-//         // Create order with pending_payment status
-//         // const amountInPaise = total_amount * 100;
-//         const { data: order, error: orderError } = await supabase
-//             .from("orders")
-//             .insert({
-//                 user_id,
-//                 total_amount,
-//                 status: "pending_payment",
-//             })
-//             .select()
-//             .single();
-
-//         if (orderError) throw orderError;
-//         console.log("orderwwwwwwww", order);
-
-
-//         // Insert order items as PENDING part of the order
-//         const orderItems = items.map(i => ({
-//             order_id: order.id,
-//             product_id: i.product_id,
-//             quantity: i.quantity,
-//             price: i.price
-//         }));
-
-//         const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
-
-//         if (itemsError) throw itemsError;
-
-//         // Return order ID so frontend can initiate payment
-//         res.json({ ...order, items: orderItems });
-//     } catch (error) {
-//         console.error("Order Creation Error:", error);
-//         res.status(500).json({ error: error.message });
-//     }
-// };
-
 
 const createOrder = async (req, res) => {
     try {

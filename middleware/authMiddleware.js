@@ -11,9 +11,11 @@ const protect = async (req, res, next) => {
         try {
             // Get token from header
             token = req.headers.authorization.split(' ')[1];
+            console.log("token", token)
 
             // Verify token
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            console.log("decoded", decoded)
 
             // Get user from token
             const { data: user, error } = await supabase

@@ -1,10 +1,12 @@
 const supabase = require('../config/supabase');
+require('dotenv').config();
 
 const getCountries = async (req, res) => {
     const { data, error } = await supabase
         .from('countries')
         .select('id, name')
         .order('name', { ascending: true });
+    console.log(";;;;;;;;;;;;", data)
 
     if (error) {
         return res.status(500).json({ error: error.message });
