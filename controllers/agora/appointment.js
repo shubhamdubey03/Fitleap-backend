@@ -1,6 +1,32 @@
 const supabase = require('../../config/supabase');
 const { generateToken } = require('../../config/agora');
 const crypto = require('crypto');
+const dayjs = require('dayjs');
+
+const updateExpiredAppointments = async () => {
+    try {
+        const now = dayjs();
+        const currentDate = now.format('YYYY-MM-DD');
+        const currentTime = now.format('HH:mm');
+
+        // Update appointments where date is in the past
+        await supabase
+            .from('appointments')
+            .update({ status: 'expired' })
+            .in('status', ['requested', 'accepted'])
+            .lt('appointment_date', currentDate);
+
+        // Update appointments where date is today but end_time has passed
+        await supabase
+            .from('appointments')
+            .update({ status: 'expired' })
+            .in('status', ['requested', 'accepted'])
+            .eq('appointment_date', currentDate)
+            .lt('end_time', currentTime);
+    } catch (error) {
+        console.error("Error updating expired appointments:", error);
+    }
+};
 
 exports.book = async (req, res) => {
     const user_id = req.user.id;
@@ -33,6 +59,7 @@ exports.book = async (req, res) => {
 };
 
 exports.getRequests = async (req, res) => {
+    await updateExpiredAppointments();
     const coach_id = req.user.id;
     console.log("coach_id", coach_id);
 
@@ -47,6 +74,7 @@ exports.getRequests = async (req, res) => {
 
 
 exports.myAppointments = async (req, res) => {
+    await updateExpiredAppointments();
     const user_id = req.user.id;
     const { data, error } = await supabase
         .from('appointments')
@@ -58,6 +86,7 @@ exports.myAppointments = async (req, res) => {
 };
 
 exports.getOne = async (req, res) => {
+    await updateExpiredAppointments();
     const { id } = req.params;
     const { data, error } = await supabase
         .from('appointments')
@@ -69,6 +98,7 @@ exports.getOne = async (req, res) => {
     res.json(data);
 };
 exports.getCoachAppointments = async (req, res) => {
+    await updateExpiredAppointments();
     const coach_id = req.user.id;
 
     const { data, error } = await supabase
@@ -112,7 +142,7 @@ exports.accept = async (req, res) => {
             channel_name: channel,
             agora_token: token
         })
-        .eq('user_id', id)
+        .eq('id', id)
         .eq('coach_id', coach_id)
         .select();
     console.log("data appointment", data);
@@ -158,13 +188,31 @@ exports.cancel = async (req, res) => {
 
 exports.refreshAgoraToken = async (req, res) => {
     const { id } = req.params;
+    const user_id = req.user.id;
+    const role = req.user.role;
+
     const { data: appt } = await supabase
         .from('appointments')
-        .select('channel_name')
+        .select('channel_name, user_id, coach_id')
         .eq('id', id)
         .single();
 
     if (!appt || !appt.channel_name) return res.status(400).json({ error: "Invalid appointment" });
+
+    // If requester is a User, check for active subscription with the coach
+    if (role === 'User') {
+        const { data: sub } = await supabase
+            .from('subscriptions')
+            .select('id')
+            .eq('user_id', user_id)
+            .eq('coach_id', appt.coach_id)
+            .eq('status', 'active')
+            .maybeSingle();
+
+        if (!sub) {
+            return res.status(403).json({ error: "Active subscription required to refresh token" });
+        }
+    }
 
     const token = generateToken(appt.channel_name);
     await supabase.from('appointments').update({ agora_token: token }).eq('id', id);

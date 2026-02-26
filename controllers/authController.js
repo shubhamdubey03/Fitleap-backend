@@ -564,12 +564,35 @@ const updateUserProfile = async (req, res) => {
 const getUserProfile = async (req, res) => {
     try {
         const user = req.user; // Attached by protect middleware
+        console.log("user", user)
 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        res.status(200).json(user);
+        // Check if user has any active subscription
+        const { data: subscription } = await supabase
+            .from('subscriptions')
+            .select('id, end_date')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .gte('end_date', new Date().toISOString())
+            .limit(1)
+            .maybeSingle();
+
+        if (subscription) {
+            await supabase
+                .from('users')
+                .update({ is_subscribed: true })
+                .eq('id', user.id);
+        }
+
+        const userData = {
+            ...user,
+            subscription: !!subscription
+        };
+        console.log("iiiiiiiiiii", userData)
+        res.status(200).json(userData);
     } catch (error) {
         console.error("Get Profile Error:", error);
         res.status(500).json({ message: 'Server Error', error: error.message });

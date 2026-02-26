@@ -11,6 +11,8 @@ const feedbackRoutes = require('./routes/feedbackRoutes');
 const locationRoutes = require('./routes/location');
 const invoiceRoutes = require('./routes/invoiceRoutes');
 const stateRoutes = require('./routes/stateRoute/stateRoutes');
+const chatRoutes = require("./routes/chatRoute/chatRoutes");
+const messageRoutes = require("./routes/chatRoute/messageRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -38,7 +40,8 @@ app.use('/api/vendors', require('./routes/vendorRoute/vendorRoutes'));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', require('./routes/adminRoutes'));
-app.use('/api/chat', require('./routes/chatRoutes'));
+app.use("/api/v1/chats", chatRoutes);
+app.use("/api/v1/messages", messageRoutes);
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/v1/subscriptions', require('./routes/agoraRoutes/subscriptions.routes'));
 app.use('/api/v1', require('./routes/agoraRoutes/availability.routes'));
@@ -66,7 +69,12 @@ io.on('connection', (socket) => {
 
     socket.on('join', (userId) => {
         socket.join(userId);
-        console.log(`User ${userId} joined room`);
+        console.log(`User ${userId} joined their personal room`);
+    });
+
+    socket.on('join_chat', (chatId) => {
+        socket.join(chatId);
+        console.log(`Socket ${socket.id} joined chat room: ${chatId}`);
     });
 
     socket.on('disconnect', () => {
