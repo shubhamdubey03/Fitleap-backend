@@ -144,6 +144,8 @@ const signupUser = async (req, res) => {
                 referral_code: user.referral_code,
                 role: user.role,
                 is_premium: user.is_premium || false,
+                is_subscribed: user.is_subscribed || false,
+                // subscription: user.is_subscribed || false,
                 token: generateToken(user.id),
             });
         } else {
@@ -347,6 +349,8 @@ const login = async (req, res) => {
             email: user.email,
             role: user.role,
             is_premium: user.is_premium || false,
+            is_subscribed: user.is_subscribed || false,
+            subscription: user.is_subscribed || false,
             token: generateToken(user.id),
         });
 
@@ -570,28 +574,36 @@ const getUserProfile = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // Check if user has any active subscription
-        const { data: subscription } = await supabase
+        // Check for all active subscriptions and get coach names
+        const { data: subscriptions } = await supabase
             .from('subscriptions')
-            .select('id, end_date')
+            .select('id, end_date, coach:coach_id(name)')
             .eq('user_id', user.id)
             .eq('status', 'active')
-            .gte('end_date', new Date().toISOString())
-            .limit(1)
-            .maybeSingle();
+            .gte('end_date', new Date().toISOString());
 
-        if (subscription) {
+        const is_subscribed = subscriptions && subscriptions.length > 0;
+
+        if (is_subscribed) {
             await supabase
                 .from('users')
                 .update({ is_subscribed: true })
                 .eq('id', user.id);
         }
 
+        // Get unique coach names
+        const coachNames = subscriptions
+            ? [...new Set(subscriptions.map(s => s.coach?.name).filter(Boolean))].join(', ')
+            : null;
+
         const userData = {
             ...user,
-            subscription: !!subscription
+            is_premium: user.is_premium || is_subscribed,
+            is_subscribed: user.is_subscribed || is_subscribed,
+            subscription: is_subscribed,
+            coach_name: coachNames || null
         };
-        console.log("iiiiiiiiiii", userData)
+        console.log("Profile Data with Coaches:", userData)
         res.status(200).json(userData);
     } catch (error) {
         console.error("Get Profile Error:", error);

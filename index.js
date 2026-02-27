@@ -13,6 +13,9 @@ const invoiceRoutes = require('./routes/invoiceRoutes');
 const stateRoutes = require('./routes/stateRoute/stateRoutes');
 const chatRoutes = require("./routes/chatRoute/chatRoutes");
 const messageRoutes = require("./routes/chatRoute/messageRoutes");
+const workoutRoutes = require('./routes/workRoutes/workRoutes');
+const workoutCategoryRoutes = require('./routes/workRoutes/workoutCategoryRoutes');
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -47,6 +50,8 @@ app.use('/api/v1/subscriptions', require('./routes/agoraRoutes/subscriptions.rou
 app.use('/api/v1', require('./routes/agoraRoutes/availability.routes'));
 app.use('/api/v1', require('./routes/agoraRoutes/slots.routes'));
 app.use('/api/v1/appointments', require('./routes/agoraRoutes/appointments.routes'));
+app.use('/api/workouts', workoutRoutes);
+app.use('/api/workout-categories', workoutCategoryRoutes);
 
 
 app.get('/', (req, res) => {

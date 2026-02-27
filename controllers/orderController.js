@@ -32,11 +32,47 @@ const createOrder = async (req, res) => {
 
         if (error) throw error;
 
-        console.log("response", data);
+        console.log("Order created successfully:", data);
+
+        // 🔄 Stock Reduction Logic
+        try {
+            for (const item of items) {
+                // 1️⃣ Get current product stock
+                const { data: product, error: fetchError } = await supabase
+                    .from("products")
+                    .select("stock")
+                    .eq("id", item.product_id)
+                    .single();
+
+                if (fetchError) {
+                    console.error(`Error fetching stock for product ${item.product_id}:`, fetchError);
+                    continue;
+                }
+
+                if (product) {
+                    const newStock = (product.stock || 0) - item.quantity;
+                    console.log(`Reducing stock for ${item.product_id}: ${product.stock} -> ${newStock}`);
+
+                    // 2️⃣ Update product stock
+                    const { error: updateError } = await supabase
+                        .from("products")
+                        .update({ stock: Math.max(0, newStock) }) // Prevent negative stock
+                        .eq("id", item.product_id);
+
+                    if (updateError) {
+                        console.error(`Error updating stock for product ${item.product_id}:`, updateError);
+                    }
+                }
+            }
+        } catch (stockErr) {
+            console.error("Stock update loop error:", stockErr);
+            // We don't fail the whole request if stock update fails, but we should log it
+        }
 
         res.status(201).json(data);
 
     } catch (err) {
+        console.error("Create Order Error:", err);
         res.status(500).json({ error: err.message });
     }
 };

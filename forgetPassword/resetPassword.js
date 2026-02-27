@@ -3,11 +3,17 @@ const supabase = require('../config/supabase');
 
 
 const resetPassword = async (req, res) => {
-    const { token } = req.body;
-    console.log("tokenttttttttttttt", token);
+    // 0. Get token from body or params
+    const token = req.body.token || req.params.token;
     const { newPassword, confirmPassword } = req.body;
 
+    console.log("Processing reset for token:", token);
+
     // 1. Basic validation
+    if (!token) {
+        return res.status(400).json({ message: "Reset token is required" });
+    }
+
     if (!newPassword || !confirmPassword) {
         return res.status(400).json({ message: "Password fields required" });
     }
@@ -21,41 +27,35 @@ const resetPassword = async (req, res) => {
     }
 
     // 2. Get token row
-    const tokenRow = await supabase
+    const { data: tokenData, error: tokenError } = await supabase
         .from('user_tokens')
         .select('*')
         .eq('token', token)
         .single();
 
-    console.log(";;;;;;;;;", tokenRow);
-
-    if (!tokenRow) {
+    if (tokenError || !tokenData) {
         return res.status(400).json({ message: "Invalid or expired token" });
     }
 
-    // // 3. Expiry check
-    // if (new Date(tokenRow.expires_at) < new Date()) {
-    //     return res.status(400).json({ message: "Token expired" });
-    // }
-
     // 4. Hash password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    console.log("hashedPassword", hashedPassword);
 
     // 5. Update user password
-    const { data, error } = await supabase
+    const { error: updateError } = await supabase
         .from('users')
         .update({ password: hashedPassword })
-        .eq('id', tokenRow.data.user_id);
+        .eq('id', tokenData.user_id);
 
-    console.log("data", data);
-    console.log("error", error);
+    if (updateError) {
+        console.error("Update password error:", updateError);
+        return res.status(500).json({ message: "Failed to update password" });
+    }
 
-    // 6. Mark token used
+    // 6. Mark token used by deleting it
     await supabase
         .from('user_tokens')
         .delete()
-        .eq('id', tokenRow.id);
+        .eq('id', tokenData.id);
 
     res.json({ message: "Password reset successful" });
 };

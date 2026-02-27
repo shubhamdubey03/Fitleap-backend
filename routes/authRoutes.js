@@ -20,6 +20,7 @@ router.post('/google', googleLogin);
 router.post('/forgot-password', forgotPassword);
 router.post('/verify-reset-token', verifyResetToken);
 router.post('/reset-password', resetPassword);
+router.post('/reset-password/:token', resetPassword);
 router.post('/google-simple', require('../controllers/authController').googleLoginSimple);
 router.put('/update-profile', protect, upload.single('profileImage'), require('../controllers/authController').updateUserProfile);
 router.get('/profile', protect, require('../controllers/authController').getUserProfile);
