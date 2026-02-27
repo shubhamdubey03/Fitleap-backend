@@ -1,7 +1,8 @@
 const express = require('express');
-const { createOrder, updateOrderStatus, createProduct, getProducts, productDetails, deleteProduct, saveAddress, getAddress, getAddresses, getUserOrders, deleteAddress, updateAddress } = require('../controllers/orderController');
+const { createOrder, updateOrderStatus, createProduct, getProducts, productDetails, deleteProduct, saveAddress, getAddress, getAddresses, getUserOrders, deleteAddress, updateAddress, getAllOrders } = require('../controllers/orderController');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
+const orderController = require("../controllers/orderController");
 
 const { protect } = require('../middleware/authMiddleware');
 
@@ -21,7 +22,12 @@ router.get("/address", protect, getAddresses);
 router.put("/address/:id", protect, updateAddress);
 router.delete("/address/:id", protect, deleteAddress);
 
-
+router.patch(
+    "/:id/delivery-status",
+    protect,
+    orderController.updateDeliveryStatus
+);
+router.get("/all", protect, getAllOrders);
 router.get("/user", protect, getUserOrders);
 
 module.exports = router;

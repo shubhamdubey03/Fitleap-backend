@@ -2,6 +2,7 @@ const supabase = require('../../config/supabase');
 const { generateToken } = require('../../config/agora');
 const crypto = require('crypto');
 const dayjs = require('dayjs');
+const { updateReward } = require('../reward/rewardController');
 
 const updateExpiredAppointments = async () => {
     try {
@@ -172,18 +173,26 @@ exports.reject = async (req, res) => {
 };
 
 exports.cancel = async (req, res) => {
-    const user_id = req.user.id;
-    const { id } = req.params;
+    try {
+        const userId = req.user.id;
+        const role = req.user.role;
+        const { id } = req.params;
 
-    const { error } = await supabase
-        .from('appointments')
-        .update({ status: 'cancelled' })
-        .eq('id', id)
-        .eq('user_id', user_id);
+        let query = supabase.from('appointments').update({ status: 'cancelled' }).eq('id', id);
 
-    if (error) return res.status(400).json({ error: error.message });
+        if (role === 'Coach') {
+            query = query.eq('coach_id', userId);
+        } else {
+            query = query.eq('user_id', userId);
+        }
 
-    res.json({ success: true });
+        const { error } = await query;
+        if (error) throw error;
+
+        res.json({ success: true, message: "Appointment cancelled" });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
 };
 
 exports.refreshAgoraToken = async (req, res) => {
@@ -218,4 +227,63 @@ exports.refreshAgoraToken = async (req, res) => {
     await supabase.from('appointments').update({ agora_token: token }).eq('id', id);
 
     res.json({ success: true, agora_token: token });
+};
+exports.completeAppointment = async (req, res) => {
+    try {
+        const appointmentId = req.params.appointmentId?.trim();
+        const current_user_id = req.user.id;
+
+        console.log("Complete Appointment API called for ID:", appointmentId);
+
+        if (!appointmentId) {
+            return res.status(400).json({ error: "Appointment ID is required" });
+        }
+
+        // 1️⃣ Get appointment and verify existence
+        const { data: appt, error: apptError } = await supabase
+            .from('appointments')
+            .select('*')
+            .eq('id', appointmentId)
+            .single();
+
+        console.log("kkkkkkkkkkk", appt);
+
+        if (apptError || !appt) {
+            console.error("Appointment not found:", apptError);
+            return res.status(404).json({ error: "Appointment not found" });
+        }
+
+        // Verify authorization: current user must be either the coach or the user
+        if (appt.coach_id !== current_user_id && appt.user_id !== current_user_id) {
+            return res.status(403).json({ error: "Unauthorized to complete this appointment" });
+        }
+
+        if (appt.status === 'completed') {
+            return res.json({ success: true, message: "Appointment already completed" });
+        }
+        if (!appt.reward_given) {
+            try {
+                let newBalance = 15 + req.user.wallet_balance;
+                const { error: walletError } = await supabase
+                    .from('users')
+                    .update({ wallet_balance: newBalance })
+                    .eq('id', appt.user_id);
+                console.log("Reward given to user:", appt.user_id);
+                console.log("Reward given to user:", appt.session_coin);
+                await supabase
+                    .from('appointments')
+                    .update({ reward_given: true, status: 'completed' })
+                    .eq('id', appointmentId);
+                console.log("Reward given to user:", appt.user_id);
+            } catch (rewardError) {
+                console.error("Error giving reward:", rewardError);
+            }
+        }
+
+        res.json({ success: true, message: "Appointment completed & wallet updated" });
+
+    } catch (error) {
+        console.error("Complete Appointment Error:", error);
+        res.status(500).json({ error: error.message });
+    }
 };

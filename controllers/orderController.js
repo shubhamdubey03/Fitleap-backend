@@ -307,6 +307,7 @@ const getUserOrders = async (req, res) => {
                 tax,
                 total_price,
                 status,
+                delivery_status,
                 created_at,
                 invoice_url,
 
@@ -350,4 +351,126 @@ const getUserOrders = async (req, res) => {
     }
 };
 
-module.exports = { createOrder, updateOrderStatus, createProduct, productDetails, getProducts, deleteProduct, saveAddress, getAddress, getUserOrders, getAddresses, deleteAddress, updateAddress };
+const getAllOrders = async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from("orders")
+            .select(`
+                id,
+                quantity,
+                unit_price,
+                price,
+                tax,
+                total_price,
+                status,
+                delivery_status,
+                created_at,
+                invoice_url,
+                user_id,
+                products (
+                    id,
+                    name,
+                    price,
+                    image_url
+                ),
+                users:user_id (
+                    id,
+                    name,
+                    email,
+                    phone
+                ),
+                payments (
+                    status,
+                    payment_method,
+                    amount
+                ),
+                addresses (
+                    id,
+                    name,
+                    mobile_number,
+                    address1,
+                    address2,
+                    city,
+                    pincode,
+                    address_type,
+                    states (
+                        id,
+                        name
+                    )
+                )
+           `)
+            .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+const allowedStatuses = [
+    "pending",
+    "confirmed",
+    "packed",
+    "shipped",
+    "out_for_delivery",
+    "delivered",
+    "cancelled"
+];
+
+const updateDeliveryStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { delivery_status } = req.body;
+
+        // 1️⃣ Validate status
+        if (!allowedStatuses.includes(delivery_status)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid delivery status"
+            });
+        }
+
+        // 2️⃣ Check order exists
+        const { data: order, error: fetchError } = await supabase
+            .from("orders")
+            .select("*")
+            .eq("id", id)
+            .single();
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: "Order not found"
+            });
+        }
+
+        // 3️⃣ Update status
+        const { data, error } = await supabase
+            .from("orders")
+            .update({
+                delivery_status,
+                updated_at: new Date()
+            })
+            .eq("id", id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            message: "Delivery status updated successfully",
+            data
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
+module.exports = { createOrder, updateOrderStatus, updateDeliveryStatus, createProduct, productDetails, getProducts, deleteProduct, saveAddress, getAddress, getUserOrders, getAddresses, deleteAddress, updateAddress, getAllOrders };

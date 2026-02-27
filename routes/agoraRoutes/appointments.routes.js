@@ -10,5 +10,6 @@ router.patch('/:id/reject', protect, ctrl.reject);
 router.get('/:id', protect, ctrl.getOne);
 router.patch('/:id/cancel', protect, ctrl.cancel);
 router.post('/:id/refresh-token', protect, ctrl.refreshAgoraToken);
+router.patch('/:appointmentId/complete', protect, ctrl.completeAppointment);
 
 module.exports = router;
