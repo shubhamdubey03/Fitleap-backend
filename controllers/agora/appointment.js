@@ -81,7 +81,6 @@ exports.myAppointments = async (req, res) => {
         .from('appointments')
         .select('*, coach:coach_id(id, name)')
         .eq('user_id', user_id);
-
     if (error) return res.status(400).json({ error: error.message });
     res.json(data);
 };

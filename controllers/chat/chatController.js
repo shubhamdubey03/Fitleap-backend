@@ -1,10 +1,12 @@
 const supabase = require("../../config/supabase");
+const dayjs = require('dayjs');
 
 exports.createOrGetChat = async (req, res) => {
     try {
         const loggedInUserId = req.user.id;
         const loggedInUserRole = req.user.role;
         const otherParticipantId = req.body.coach_id; // This is the ID passed from frontend
+        console.log("otherParticipantId", otherParticipantId)
 
         // Determine who is the Student and who is the Coach
         let student_id, coach_id;
@@ -26,7 +28,7 @@ exports.createOrGetChat = async (req, res) => {
             .eq("user_id", student_id)
             .eq("coach_id", coach_id)
             .eq("status", "active")
-            .gte("end_date", new Date().toISOString())
+            .gte("end_date", dayjs().format('YYYY-MM-DD'))
             .maybeSingle();
 
         if (subError) throw subError;

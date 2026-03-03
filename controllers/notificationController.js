@@ -65,9 +65,9 @@ const saveTokenAndNotify = async (req, res) => {
     }
 };
 
-// @desc    Send Broadcast Notification to All Users
+// @desc    Send and Store Broadcast Notification to All Users
 // @route   POST /api/notifications/broadcast
-// @access  Public (Should be Admin only in prod)
+// @access  Private (Admin)
 const sendBroadcastNotification = async (req, res) => {
     try {
         const { title, body, data } = req.body;
@@ -76,34 +76,38 @@ const sendBroadcastNotification = async (req, res) => {
             return res.status(400).json({ message: 'Title and Body are required for broadcast' });
         }
 
-        console.log(`Broadcasting: ${title}`);
+        // 1. Store in Database
+        const { error: dbError } = await supabase
+            .from('notifications')
+            .insert([{
+                title,
+                body,
+                type: 'broadcast',
+                data: data || {},
+                is_read: false
+            }]);
 
-        if (!admin.apps.length) {
-            return res.status(500).json({ message: 'Firebase Admin not initialized.' });
+        if (dbError) {
+            console.error('Error saving broadcast notification to DB:', dbError);
         }
 
-        const message = {
-            topic: 'all_users', // The topic name we subscribed to on frontend
-            notification: {
-                title: title,
-                body: body,
-            },
-            data: data || {},
-            android: {
-                priority: 'high',
-                notification: {
-                    channelId: 'default',
-                }
-            },
-        };
-
-        const response = await admin.messaging().send(message);
-        console.log('Successfully sent broadcast message:', response);
+        // 2. Send Push Notification via FCM
+        if (admin.apps.length) {
+            const message = {
+                topic: 'all_users',
+                notification: { title, body },
+                data: data || {},
+                android: {
+                    priority: 'high',
+                    notification: { channelId: 'default' }
+                },
+            };
+            await admin.messaging().send(message);
+        }
 
         return res.status(200).json({
             success: true,
-            message: 'Broadcast sent successfully',
-            response
+            message: 'Broadcast sent and stored successfully'
         });
 
     } catch (error) {
@@ -112,7 +116,69 @@ const sendBroadcastNotification = async (req, res) => {
     }
 };
 
+// @desc    Get Notifications for a User
+// @route   GET /api/notifications
+// @access  Private
+const getUserNotifications = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Fetch broadcast notifications and targeted notifications for this user
+        const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .or(`user_id.eq.${userId},type.eq.broadcast`)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching notifications', error: error.message });
+    }
+};
+
+// @desc    Mark Notification as Read
+// @route   PUT /api/notifications/:id/read
+// @access  Private
+const markAsRead = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { error } = await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('id', id)
+            .or(`user_id.eq.${userId},type.eq.broadcast`);
+
+        if (error) throw error;
+        res.json({ success: true, message: 'Notification marked as read' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error updating notification', error: error.message });
+    }
+};
+// PUT /api/notifications/read-all
+const markAllAsRead = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const { error } = await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .or(`user_id.eq.${userId},type.eq.broadcast`);
+
+        if (error) throw error;
+
+        res.json({ success: true });
+
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     saveTokenAndNotify,
-    sendBroadcastNotification
+    sendBroadcastNotification,
+    getUserNotifications,
+    markAsRead,
+    markAllAsRead
 };
+

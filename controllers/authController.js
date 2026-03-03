@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const { updateReward } = require('./reward/rewardController');
+const dayjs = require('dayjs');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -574,22 +575,22 @@ const getUserProfile = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // Check for all active subscriptions and get coach names
+        // Check for all active subscriptions and get coach details
         const { data: subscriptions } = await supabase
             .from('subscriptions')
-            .select('id, end_date, coach:coach_id(name)')
+            .select('id, end_date, coach_id, coach:coach_id(name)')
             .eq('user_id', user.id)
             .eq('status', 'active')
-            .gte('end_date', new Date().toISOString());
+            .gte('end_date', dayjs().format('YYYY-MM-DD'));
 
         const is_subscribed = subscriptions && subscriptions.length > 0;
+        const subscribed_coach_ids = subscriptions ? subscriptions.map(s => s.coach_id).filter(Boolean) : [];
 
-        if (is_subscribed) {
-            await supabase
-                .from('users')
-                .update({ is_subscribed: true })
-                .eq('id', user.id);
-        }
+        // Always sync the actual status in the database
+        await supabase
+            .from('users')
+            .update({ is_subscribed: is_subscribed })
+            .eq('id', user.id);
 
         // Get unique coach names
         const coachNames = subscriptions
@@ -598,8 +599,10 @@ const getUserProfile = async (req, res) => {
 
         const userData = {
             ...user,
+            _id: user.id, // For Redux compatibility
             is_premium: user.is_premium || is_subscribed,
-            is_subscribed: user.is_subscribed || is_subscribed,
+            is_subscribed: is_subscribed, // Use the real-time result
+            subscribed_coach_ids,
             subscription: is_subscribed,
             coach_name: coachNames || null
         };

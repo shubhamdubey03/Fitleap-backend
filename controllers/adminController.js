@@ -9,12 +9,11 @@ const getAllCoaches = async (req, res) => {
             .from('coaches')
             .select(`
                 *,
-                users:user_id (name, email, phone)
+                users:user_id (name, email, phone, profile_image)
             `); // Removed filter .eq('is_approved', true) since approval is removed
 
         if (error) throw error;
-
-        res.json(data);
+        res.json({ data });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error', error: error.message });
