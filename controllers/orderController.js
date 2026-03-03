@@ -5,12 +5,48 @@ const createOrder = async (req, res) => {
     try {
         const user_id = req.user.id;
         console.log("user_id", user_id);
-        const { items, address_id } = req.body;
-        console.log("kakakak", req.body)
+        const { items, address_id, use_coins } = req.body;
+        console.log("Request Body:", req.body);
+
+
+        // 1️⃣ Calculate cart total
+        let cartTotal = 0;
+
+        items.forEach(item => {
+            const price = item.price * item.quantity;
+            // Removed 5% tax addition here to match frontend totals
+            cartTotal += price;
+        });
+
+        // 2️⃣ Get user wallet
+        const { data: user, error: userError } = await supabase
+            .from("users")
+            .select("wallet_balance")
+            .eq("id", user_id)
+            .single();
+
+        if (userError) throw userError;
+
+        const userWallet = user.wallet_balance || 0;
+        console.log("userWallet", userWallet);
+
+        // 3️⃣ Apply 25% rule if toggled
+        // Logic: Pay using up to 25% of your TOTAL WALLET BALANCE, capped by the cart total
+        const maxCoinUsageAllowed = parseFloat((userWallet * 0.25).toFixed(2));
+        const walletUsed = use_coins ? Math.min(maxCoinUsageAllowed, cartTotal) : 0;
+        const finalPayable = parseFloat((cartTotal - walletUsed).toFixed(2));
+
+        console.log(`--- Order Coin Calculation ---`);
+        console.log(`Cart Total: ₹${cartTotal}`);
+        console.log(`User Wallet: ${userWallet} coins`);
+        console.log(`Max Usage Allowed (25% of wallet): ${maxCoinUsageAllowed}`);
+        console.log(`Actually Used: ${walletUsed} coins`);
+        console.log(`Final Payable: ₹${finalPayable}`);
+        console.log(`------------------------------`);
         const ordersData = items.map(item => {
             const price = item.price * item.quantity;
-            const tax = price * 0.05;
-            const total_price = price + tax;
+            const tax = 0; // Tax already included in price
+            const total_price = price;
 
             return {
                 user_id,
@@ -19,7 +55,8 @@ const createOrder = async (req, res) => {
                 unit_price: item.price,
                 price,
                 tax,
-                total_price,
+                wallet_used: walletUsed / items.length, // optional split
+                total_price: total_price - (walletUsed / items.length),
                 status: "pending",
                 address_id
             };
@@ -31,49 +68,30 @@ const createOrder = async (req, res) => {
             .select();
 
         if (error) throw error;
-
-        console.log("Order created successfully:", data);
-
-        // 🔄 Stock Reduction Logic
-        try {
-            for (const item of items) {
-                // 1️⃣ Get current product stock
-                const { data: product, error: fetchError } = await supabase
-                    .from("products")
-                    .select("stock")
-                    .eq("id", item.product_id)
-                    .single();
-
-                if (fetchError) {
-                    console.error(`Error fetching stock for product ${item.product_id}:`, fetchError);
-                    continue;
-                }
-
-                if (product) {
-                    const newStock = (product.stock || 0) - item.quantity;
-                    console.log(`Reducing stock for ${item.product_id}: ${product.stock} -> ${newStock}`);
-
-                    // 2️⃣ Update product stock
-                    const { error: updateError } = await supabase
-                        .from("products")
-                        .update({ stock: Math.max(0, newStock) }) // Prevent negative stock
-                        .eq("id", item.product_id);
-
-                    if (updateError) {
-                        console.error(`Error updating stock for product ${item.product_id}:`, updateError);
-                    }
-                }
-            }
-        } catch (stockErr) {
-            console.error("Stock update loop error:", stockErr);
-            // We don't fail the whole request if stock update fails, but we should log it
+        if (walletUsed > 0) {
+            const finalWallet = parseFloat((userWallet - walletUsed).toFixed(2));
+            console.log("finalWallet", finalWallet);
+            console.log("Wallet Used", walletUsed);
+            await supabase
+                .from("users")
+                .update({ wallet_balance: finalWallet })
+                .eq("id", user_id);
         }
 
-        res.status(201).json(data);
+        // 5️⃣ Send Final Response
+        // This is the ONLY response that should be sent in this function
+        return res.status(201).json({
+            orders: data,
+            cartTotal,
+            walletUsed,
+            finalPayable
+        });
 
     } catch (err) {
         console.error("Create Order Error:", err);
-        res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+            res.status(500).json({ error: err.message });
+        }
     }
 };
 
@@ -119,6 +137,54 @@ const createProduct = async (req, res) => {
         const { data, error } = await supabase
             .from("products")
             .insert({ name, description, price, stock, image_url, category })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+const updateProduct = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, description, price, stock, category } = req.body;
+        let image_url = req.body.image_url;
+
+        // Handle File Upload (Optional update)
+        if (req.file) {
+            const fileName = `product_${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const { error: uploadError } = await supabase.storage
+                .from('product_images')
+                .upload(fileName, req.file.buffer, {
+                    contentType: req.file.mimetype,
+                    upsert: true
+                });
+
+            if (uploadError) throw new Error('Image upload failed: ' + uploadError.message);
+
+            const { data: publicData } = supabase.storage
+                .from('product_images')
+                .getPublicUrl(fileName);
+
+            image_url = publicData.publicUrl;
+        }
+
+        const updates = {};
+        if (name !== undefined) updates.name = name;
+        if (description !== undefined) updates.description = description;
+        if (price !== undefined) updates.price = price;
+        if (stock !== undefined) updates.stock = stock;
+        if (category !== undefined) updates.category = category;
+        if (image_url !== undefined) updates.image_url = image_url;
+
+        const { data, error } = await supabase
+            .from("products")
+            .update(updates)
+            .eq("id", id)
             .select()
             .single();
 
@@ -509,4 +575,4 @@ const updateDeliveryStatus = async (req, res) => {
     }
 };
 
-module.exports = { createOrder, updateOrderStatus, updateDeliveryStatus, createProduct, productDetails, getProducts, deleteProduct, saveAddress, getAddress, getUserOrders, getAddresses, deleteAddress, updateAddress, getAllOrders };
+module.exports = { createOrder, updateOrderStatus, updateDeliveryStatus, createProduct, updateProduct, productDetails, getProducts, deleteProduct, saveAddress, getAddress, getUserOrders, getAddresses, deleteAddress, updateAddress, getAllOrders };

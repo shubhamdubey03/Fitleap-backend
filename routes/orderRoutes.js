@@ -1,5 +1,5 @@
 const express = require('express');
-const { createOrder, updateOrderStatus, createProduct, getProducts, productDetails, deleteProduct, saveAddress, getAddress, getAddresses, getUserOrders, deleteAddress, updateAddress, getAllOrders } = require('../controllers/orderController');
+const { createOrder, updateOrderStatus, createProduct, updateProduct, getProducts, productDetails, deleteProduct, saveAddress, getAddress, getAddresses, getUserOrders, deleteAddress, updateAddress, getAllOrders } = require('../controllers/orderController');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 const orderController = require("../controllers/orderController");
@@ -12,6 +12,7 @@ router.post("/create", protect, createOrder); // Order Routes
 router.put("/status", protect, updateOrderStatus);
 
 router.post("/products", protect, upload.single('image'), createProduct); // Product Routes
+router.put("/products/:id", protect, upload.single('image'), updateProduct); // Edit Product
 router.get("/products", protect, getProducts);
 router.get("/products/:productId", protect, productDetails);
 router.delete("/products/:id", protect, deleteProduct);
