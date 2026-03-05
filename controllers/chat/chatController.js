@@ -106,12 +106,20 @@ exports.getConversations = async (req, res) => {
                     .limit(1)
                     .maybeSingle();
 
+                const { count: unreadCount } = await supabase
+                    .from("messages")
+                    .select("*", { count: 'exact', head: true })
+                    .eq("chat_id", chat.id)
+                    .eq("is_read", false)
+                    .neq("sender_id", userId);
+
                 const otherUser = role === 'Coach' ? chat.user : chat.coach;
 
                 return {
                     chat_id: chat.id,
                     other_user: otherUser,
                     last_message: lastMsg,
+                    unread_count: unreadCount || 0
                 };
             })
         );

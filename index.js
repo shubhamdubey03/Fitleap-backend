@@ -7,7 +7,8 @@ const path = require('path');
 
 const orderRoutes = require("./routes/orderRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
-const feedbackRoutes = require('./routes/feedbackRoutes');
+const feedbackRoutes = require('./routes/feedbackRoute/feedbackRoutes');
+const productFeedbackRoutes = require('./routes/feedbackRoute/productFeedbackRoutes');
 const locationRoutes = require('./routes/location');
 const invoiceRoutes = require('./routes/invoiceRoutes');
 const stateRoutes = require('./routes/stateRoute/stateRoutes');
@@ -32,6 +33,7 @@ app.use((req, res, next) => {
 app.use('/invoices', express.static(path.join(__dirname, 'invoices')));
 app.use('/api/invoice', invoiceRoutes);
 app.use('/api', feedbackRoutes);
+app.use('/api', productFeedbackRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use('/api', locationRoutes);

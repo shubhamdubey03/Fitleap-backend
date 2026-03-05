@@ -124,7 +124,7 @@ exports.mySubscriptions = async (req, res) => {
     console.log("user_id", user_id)
     const { data, error } = await supabase
         .from('subscriptions')
-        .select('*, coach:coach_id(id, name)')
+        .select('*, coach:coach_id(id, name,profile_image)')
         .eq('user_id', user_id)
         .order('created_at', { ascending: false });
     console.log("datassssssssss", data);
@@ -163,11 +163,11 @@ exports.getCoachPlans = async (req, res) => {
 // Platform Plans Management (Admin)
 exports.createPlan = async (req, res) => {
     try {
-        const { plan_name, price, duration_days, features } = req.body;
+        const { plan_name, price, duration_days, features, coach_id } = req.body;
 
         const { data, error } = await supabase
             .from('coach_plans')
-            .insert([{ plan_name, price, duration_days, features }])
+            .insert([{ plan_name, price, duration_days, features, coach_id }])
             .select()
             .single();
 
@@ -195,11 +195,11 @@ exports.getPlans = async (req, res) => {
 exports.updatePlan = async (req, res) => {
     try {
         const { id } = req.params;
-        const { plan_name, price, duration_days, features } = req.body;
+        const { plan_name, price, duration_days, features, coach_id } = req.body;
 
         const { data, error } = await supabase
             .from('coach_plans')
-            .update({ plan_name, price, duration_days, features })
+            .update({ plan_name, price, duration_days, features, coach_id })
             .eq('id', id)
             .select()
             .single();
