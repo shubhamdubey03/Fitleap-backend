@@ -11,13 +11,13 @@ const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
 // GET all products
-router.get('/', getProducts);
+router.get('/', protect, getProducts);
 
 // GET single product by ID
-router.get('/:productId', productDetails);
+router.get('/:productId', protect, productDetails);
 
 // POST create product
-router.post('/', upload.single('image'), createProduct);
+router.post('/', upload.single('image'), protect, createProduct);
 
 // DELETE product
 router.delete('/:id', protect, deleteProduct);

@@ -8,6 +8,6 @@ const {
 } = require('../../controllers/feedback/productFeedbackController');
 
 router.post('/product/:product_id/review', protect, giveProductReview);
-router.get('/product/:product_id/review', getProductReviews);
+router.get('/product/:product_id/review', protect, getProductReviews);
 
 module.exports = router;

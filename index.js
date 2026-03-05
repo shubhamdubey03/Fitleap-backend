@@ -16,6 +16,8 @@ const chatRoutes = require("./routes/chatRoute/chatRoutes");
 const messageRoutes = require("./routes/chatRoute/messageRoutes");
 const workoutRoutes = require('./routes/workRoutes/workRoutes');
 const workoutCategoryRoutes = require('./routes/workRoutes/workoutCategoryRoutes');
+const dietController = require("./routes/userRoute/userRoutes");
+
 
 
 const app = express();
@@ -38,6 +40,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use('/api', locationRoutes);
 app.use('/api', stateRoutes);
+app.use('/api', require('./routes/userRoute/userRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/vendors', require('./routes/vendorRoute/vendorRoutes'));
@@ -54,6 +57,7 @@ app.use('/api/v1', require('./routes/agoraRoutes/slots.routes'));
 app.use('/api/v1/appointments', require('./routes/agoraRoutes/appointments.routes'));
 app.use('/api/workouts', workoutRoutes);
 app.use('/api/workout-categories', workoutCategoryRoutes);
+app.use('/api/diet', dietController);
 
 
 app.get('/', (req, res) => {

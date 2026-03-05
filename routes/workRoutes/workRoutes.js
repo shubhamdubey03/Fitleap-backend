@@ -7,10 +7,10 @@ const { protect } = require('../../middleware/authMiddleware');
 router.post('/', protect, workoutController.createWorkout);
 
 // ✅ Get All Workouts
-router.get('/', workoutController.getAllWorkouts);
+router.get('/', protect, workoutController.getAllWorkouts);
 
 // ✅ Get Single Workout by ID
-router.get('/:id', workoutController.getWorkoutById);
+router.get('/:id', protect, workoutController.getWorkoutById);
 
 // ✅ Update Workout
 router.put('/:workout_id', protect, workoutController.updateWorkoutTracker);

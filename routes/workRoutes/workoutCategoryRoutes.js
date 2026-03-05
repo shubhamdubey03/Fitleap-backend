@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const categoryController = require('../../controllers/workout/workoutCategoryController');
+const { protect } = require('../../middleware/authMiddleware');
 
 // Create category
-router.post('/create', categoryController.createCategory);
+router.post('/create', protect, categoryController.createCategory);
 
 // Get all categories
-router.get('/', categoryController.getCategories);
+router.get('/', protect, categoryController.getCategories);
 
 module.exports = router;
