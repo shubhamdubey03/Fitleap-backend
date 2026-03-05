@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const { updateReward } = require('./reward/rewardController');
 const dayjs = require('dayjs');
+const sendOtpEmail = require('../email/sendOtpEmail');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -38,55 +39,302 @@ const getUniqueReferralCode = async () => {
 // @desc    Register a new user (Standard Signup)
 // @route   POST /api/auth/signup-user
 // @access  Public
+// const signupUser = async (req, res) => {
+//     try {
+//         const { name, email, password, mobile, countryCode, referralByCode, role } = req.body;
+
+//         const normalizedRole = role?.trim().toLowerCase();
+
+//         // Trim and Validate
+//         const trimmedName = name?.trim();
+//         const trimmedEmail = email?.trim().toLowerCase();
+//         const trimmedPassword = password?.trim();
+//         const trimmedMobile = mobile?.trim();
+//         const trimmedCountryCode = countryCode?.trim();
+//         const userRole = (normalizedRole === 'student' || normalizedRole === 'college student')
+//             ? (normalizedRole === 'student' ? 'Student' : 'College Student')
+//             : 'User';
+
+//         if (!trimmedName || !trimmedEmail || !trimmedPassword || !trimmedMobile || !trimmedCountryCode) {
+//             return res.status(400).json({ message: 'Please add all fields, including countryCode' });
+//         }
+
+//         // Email Validation
+//         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//         if (!emailRegex.test(trimmedEmail)) {
+//             return res.status(400).json({ message: 'Please provide a valid email address' });
+//         }
+
+//         // Phone Validation (simple length check)
+//         if (trimmedMobile.length < 10) {
+//             return res.status(400).json({ message: 'Please provide a valid mobile number' });
+//         }
+
+//         // Password Validation
+//         if (trimmedPassword.length < 8) {
+//             return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+//         }
+
+//         // Check if user exists
+//         const { data: userExists, error: userExistsError } = await supabase
+//             .from('users')
+//             .select('email')
+//             .eq('email', trimmedEmail)
+//             .maybeSingle();
+
+//         if (userExists) {
+//             return res.status(400).json({ message: 'User already exists' });
+//         }
+
+//         const isEduEmail = trimmedEmail.endsWith('.edu');
+//         const isGmailEmail = trimmedEmail.endsWith('@gmail.com') || trimmedEmail.endsWith('@gamil.com'); // Supporting the typo just in case, but gmail.com is primary
+//         console.log("isEduEmail", isEduEmail);
+//         console.log("isGmailEmail", isGmailEmail);
+
+//         // Handle Student approval logic
+//         let is_active = true;
+//         if (userRole === 'Student' || userRole === 'College Student') {
+//             is_active = false;
+//         }
+
+//         // Handle ID Card Upload
+//         let id_proof_image = null;
+//         if (req.file) {
+//             const ext = req.file.originalname.split('.').pop();
+//             const fileName = `student_ids/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+//             const { error: uploadError } = await supabase.storage
+//                 .from('documents')
+//                 .upload(fileName, req.file.buffer, { contentType: req.file.mimetype });
+
+//             if (uploadError) {
+//                 console.error('ID Upload Error:', uploadError);
+//             } else {
+//                 id_proof_image = supabase.storage.from('documents').getPublicUrl(fileName).data.publicUrl;
+//             }
+//         }
+
+//         // Hash password
+//         const salt = await bcrypt.genSalt(10);
+//         const hashedPassword = await bcrypt.hash(trimmedPassword, salt);
+//         const referralCode = await getUniqueReferralCode();
+
+//         // OTP Logic for .edu emails
+//         let otp = null;
+//         let otp_expiry = null;
+//         if (isEduEmail) {
+//             otp = Math.floor(100000 + Math.random() * 900000).toString();
+//             otp_expiry = dayjs().add(10, 'minute').toISOString();
+//         }
+//         console.log("---------", isEduEmail)
+//         // Create user
+//         const { data: user, error: createError } = await supabase
+//             .from('users')
+//             .insert([
+//                 {
+//                     name: trimmedName,
+//                     email: trimmedEmail,
+//                     password: hashedPassword,
+//                     phone: trimmedMobile,
+//                     country_code: trimmedCountryCode,
+//                     role: userRole,
+//                     referral_code: referralCode,
+//                     wallet_balance: 0,
+//                     is_active: is_active,
+//                     id_proof_image: id_proof_image,
+//                     // otp: otp,
+//                     // otp_expiry: otp_expiry,
+//                     // email_verified: !isEduEmail, // Auto-verified if not .edu
+//                 },
+//             ])
+//             .select()
+//             .maybeSingle();
+//         console.log("...........", user)
+//         if (createError) {
+//             console.error('Supabase Signup Error:', createError);
+//             return res.status(400).json({ message: 'Invalid user data', error: createError.message });
+//         }
+
+//         // Send OTP email if needed (for .edu emails or specified flow)
+//         if (otp) {
+//             try {
+//                 // Store OTP in user_tokens
+//                 await supabase
+//                     .from('user_tokens')
+//                     .delete()
+//                     .eq('user_id', user.id)
+//                     .eq('token_type', 'email_verify');
+
+//                 await supabase
+//                     .from('user_tokens')
+//                     .insert([{
+//                         user_id: user.id,
+//                         token: otp,
+//                         token_type: 'email_verify',
+//                         created_at: new Date().toISOString()
+//                     }]);
+
+//                 await sendOtpEmail(trimmedEmail, otp, trimmedName);
+//             } catch (err) {
+//                 console.error("Failed to send OTP email:", err);
+//             }
+//         }
+//         console.log("-----------kkkkkkk", isEduEmail)
+//         // updating user wallet
+//         await updateReward(user.id, 'signup')
+
+//         if (referralByCode) {
+//             const { data: referrer } = await supabase
+//                 .from('users')
+//                 .select('*')
+//                 .eq('referral_code', referralByCode)
+//                 .maybeSingle();
+
+//             if (referrer && referrer.id !== user.id) {
+//                 // store referral record
+//                 await supabase.from('referrals').insert([{
+//                     referred_by: referrer.id,
+//                     referred_to: user.id,
+//                     coins: 10,
+//                     status: 'completed'
+//                 }]);
+//                 const newBalance = referrer.wallet_balance + 10;
+//                 await supabase
+//                     .from('users')
+//                     .update({ wallet_balance: newBalance })
+//                     .eq('id', referrer.id);
+//             }
+//         }
+
+//         if (user) {
+//             // If .edu, need OTP first
+//             if (isEduEmail) {
+//                 return res.status(201).json({
+//                     message: 'OTP sent to your .edu email. Please verify.',
+//                     requireOtp: true,
+//                     email: user.email,
+//                 });
+//             }
+
+//             // If not approved, send a different response
+//             if ((user.role === 'Student' || user.role === 'College Student') && !user.is_active) {
+//                 return res.status(201).json({
+//                     message: 'Signup successful! Wait for admin approval.',
+//                     _id: user.id,
+//                     name: user.name,
+//                     email: user.email,
+//                     role: user.role,
+//                 });
+//             }
+
+//             res.status(201).json({
+//                 _id: user.id,
+//                 name: user.name,
+//                 email: user.email,
+//                 referral_code: user.referral_code,
+//                 role: user.role,
+//                 is_premium: user.is_premium || false,
+//                 is_subscribed: user.is_subscribed || false,
+//                 token: generateToken(user.id),
+//             });
+//         } else {
+//             res.status(400).json({ message: 'Invalid user data' });
+//         }
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ message: 'Server Error', error: error.message });
+//     }
+// };
 const signupUser = async (req, res) => {
     try {
-        const { name, email, password, mobile, countryCode, referralByCode } = req.body;
+        const { name, email, password, mobile, countryCode, referralByCode, role } = req.body;
 
-        // Trim and Validate
+        const normalizedRole = role?.trim().toLowerCase();
+
         const trimmedName = name?.trim();
         const trimmedEmail = email?.trim().toLowerCase();
         const trimmedPassword = password?.trim();
         const trimmedMobile = mobile?.trim();
         const trimmedCountryCode = countryCode?.trim();
 
+        const userRole =
+            normalizedRole === "student"
+                ? "Student"
+                : normalizedRole === "college student"
+                    ? "College Student"
+                    : "User";
+
         if (!trimmedName || !trimmedEmail || !trimmedPassword || !trimmedMobile || !trimmedCountryCode) {
-            return res.status(400).json({ message: 'Please add all fields, including countryCode' });
+            return res.status(400).json({ message: "Please add all fields, including countryCode" });
         }
 
-        // Email Validation
+        // Email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(trimmedEmail)) {
-            return res.status(400).json({ message: 'Please provide a valid email address' });
+            return res.status(400).json({ message: "Please provide a valid email address" });
         }
 
-        // Phone Validation (simple length check)
         if (trimmedMobile.length < 10) {
-            return res.status(400).json({ message: 'Please provide a valid mobile number' });
+            return res.status(400).json({ message: "Please provide a valid mobile number" });
         }
 
-        // Password Validation
         if (trimmedPassword.length < 8) {
-            return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+            return res.status(400).json({ message: "Password must be at least 8 characters long" });
         }
 
         // Check if user exists
-        const { data: userExists, error: userExistsError } = await supabase
-            .from('users')
-            .select('email')
-            .eq('email', trimmedEmail)
+        const { data: userExists } = await supabase
+            .from("users")
+            .select("email")
+            .eq("email", trimmedEmail)
             .maybeSingle();
 
         if (userExists) {
-            return res.status(400).json({ message: 'User already exists' });
+            return res.status(400).json({ message: "User already exists" });
         }
 
-        // Hash password
+        // Email type check
+        const isEduEmail = trimmedEmail.endsWith(".edu");
+
+        // Student approval logic
+        let is_active = true;
+
+        if (userRole === "Student" || userRole === "College Student") {
+            // Both cases require approval or verification
+            is_active = false;
+        }
+
+        // Upload ID card
+        let id_proof_image = null;
+
+        if (req.file) {
+            const ext = req.file.originalname.split(".").pop();
+            const fileName = `student_ids/${Date.now()}_${Math.random()
+                .toString(36)
+                .slice(2)}.${ext}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from("documents")
+                .upload(fileName, req.file.buffer, {
+                    contentType: req.file.mimetype,
+                });
+
+            if (!uploadError) {
+                id_proof_image = supabase.storage
+                    .from("documents")
+                    .getPublicUrl(fileName).data.publicUrl;
+            }
+        }
+
+        // Password hash
         const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
+        const hashedPassword = await bcrypt.hash(trimmedPassword, salt);
+
         const referralCode = await getUniqueReferralCode();
+
         // Create user
         const { data: user, error: createError } = await supabase
-            .from('users')
+            .from("users")
             .insert([
                 {
                     name: trimmedName,
@@ -94,51 +342,111 @@ const signupUser = async (req, res) => {
                     password: hashedPassword,
                     phone: trimmedMobile,
                     country_code: trimmedCountryCode,
-                    role: 'User',
+                    role: userRole,
                     referral_code: referralCode,
-                    wallet_balance: 0
+                    wallet_balance: 0,
+                    is_active,
+                    id_proof_image,
                 },
             ])
             .select()
-            .single();
+            .maybeSingle();
+        console.log("useraaaaaaaaaaaa", user);
 
         if (createError) {
-            console.error('Supabase Signup Error:', createError);
-            return res.status(400).json({ message: 'Invalid user data', error: createError.message });
+            return res.status(400).json({
+                message: "Invalid user data",
+                error: createError.message,
+            });
         }
 
-        // updating user wallet
-        await updateReward(user.id, 'signup')
+        // Send OTP if EDU student
+        // OTP for EDU
+        let otp = null;
 
+        if (isEduEmail && (userRole === "Student" || userRole === "College Student")) {
+            otp = Math.floor(100000 + Math.random() * 900000).toString();
+            await supabase
+                .from("user_tokens")
+                .delete()
+                .eq("user_id", user.id)
+                .eq("token_type", "email_verify");
+            console.log("user.id", user.id);
+            console.log("otp", isEduEmail);
+            const { data: tokenInsert, error: tokenError } = await supabase.from("user_tokens").insert([
+                {
+                    user_id: user.id,
+                    token: otp,
+                    token_type: "email_verify",
+                    created_at: new Date().toISOString(),
+                },
+            ]);
+            console.log("tokenInsert", tokenInsert);
+            console.log("tokenError", tokenError);
+            console.log("OTP sent to", trimmedEmail);
+            await sendOtpEmail("shubham.dubeyargos@gmail.com", otp, trimmedName);
+        }
+
+        // Signup reward
+        await updateReward(user.id, "signup");
+
+        // Referral logic
         if (referralByCode) {
-
             const { data: referrer } = await supabase
-                .from('users')
-                .select('*')
-                .eq('referral_code', referralByCode)
+                .from("users")
+                .select("*")
+                .eq("referral_code", referralByCode)
                 .maybeSingle();
 
-
             if (referrer && referrer.id !== user.id) {
+                await supabase.from("referrals").insert([
+                    {
+                        referred_by: referrer.id,
+                        referred_to: user.id,
+                        coins: 10,
+                        status: "completed",
+                    },
+                ]);
 
-
-                // store referral record
-                await supabase.from('referrals').insert([{
-                    referred_by: referrer.id,
-                    referred_to: user.id,
-                    coins: 10, // you already track coins via transaction table
-                    status: 'completed'
-                }]);
-                const newBalance = referrer.wallet_balance + 10;
-                const { error: walletError } = await supabase
-                    .from('users')
-                    .update({ wallet_balance: newBalance })
-                    .eq('id', referrer.id);
+                await supabase
+                    .from("users")
+                    .update({
+                        wallet_balance: referrer.wallet_balance + 10,
+                    })
+                    .eq("id", referrer.id);
             }
         }
 
+        // Responses
         if (user) {
-            res.status(201).json({
+            // EDU student OTP
+            if (
+                (user.role === "Student" || user.role === "College Student") &&
+                isEduEmail
+            ) {
+                return res.status(201).json({
+                    message: "OTP sent to your .edu email. Please verify.",
+                    requireOtp: true,
+                    email: user.email,
+                });
+            }
+
+            // Gmail student -> admin approval
+            if (
+                (user.role === "Student" || user.role === "College Student") &&
+                !isEduEmail
+            ) {
+                return res.status(201).json({
+                    message: "Signup successful! Waiting for admin approval.",
+                    _id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                });
+            }
+
+            // Normal user
+            return res.status(201).json({
                 _id: user.id,
                 name: user.name,
                 email: user.email,
@@ -146,15 +454,138 @@ const signupUser = async (req, res) => {
                 role: user.role,
                 is_premium: user.is_premium || false,
                 is_subscribed: user.is_subscribed || false,
-                // subscription: user.is_subscribed || false,
                 token: generateToken(user.id),
             });
-        } else {
-            res.status(400).json({ message: 'Invalid user data' });
         }
+
+        res.status(400).json({ message: "Invalid user data" });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server Error', error: error.message, stack: error.stack });
+        res.status(500).json({
+            message: "Server Error",
+            error: error.message,
+        });
+    }
+};
+const verifyOtp = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        console.log(email, otp);
+
+        const trimmedEmail = email?.trim().toLowerCase();
+
+        if (!trimmedEmail || !otp) {
+            return res.status(400).json({ message: "Email and OTP required" });
+        }
+
+        // Find user
+        const { data: user } = await supabase
+            .from("users")
+            .select("*")
+            .eq("email", trimmedEmail)
+            .maybeSingle();
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        console.log("useraaaaaaaaaaaa", user);
+        // Find OTP token
+        const { data: tokenData } = await supabase
+            .from("user_tokens")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("token", otp)
+            .eq("token_type", "email_verify")
+            .maybeSingle();
+        console.log("tokenDataaaaaaaaaaaaa", tokenData);
+        if (!tokenData) {
+            return res.status(400).json({ message: "Invalid OTP" });
+        }
+
+        // Check expiry (10 minutes example)
+        // const expired = dayjs().diff(dayjs(tokenData.created_at), "minute") > 10;
+
+        // if (expired) {
+        //     return res.status(400).json({ message: "OTP expired" });
+        // }
+
+        // Verify user
+        await supabase
+            .from("users")
+            .update({
+                email_verified: true,
+                is_active: true
+            })
+            .eq("id", user.id);
+
+        // delete OTP after use
+        await supabase
+            .from("user_tokens")
+            .delete()
+            .eq("id", tokenData.id);
+
+        res.status(200).json({
+            message: "Email verified successfully",
+            _id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            token: generateToken(user.id)
+        });
+
+    } catch (error) {
+        console.error("Verify OTP Error:", error);
+        res.status(500).json({ message: "Server Error" });
+    }
+};
+
+const sendOtp = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const trimmedEmail = email?.trim().toLowerCase();
+
+        if (!trimmedEmail) {
+            return res.status(400).json({ message: 'Email is required' });
+        }
+
+        const { data: user } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', trimmedEmail)
+            .maybeSingle();
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Delete any existing verification tokens for this user
+        await supabase
+            .from('user_tokens')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('token_type', 'email_verify');
+
+        // Insert new token
+        const { error: tokenError } = await supabase
+            .from('user_tokens')
+            .insert([{
+                user_id: user.id,
+                token: otp,
+                token_type: 'email_verify',
+                created_at: new Date().toISOString()
+            }]);
+
+        if (tokenError) throw tokenError;
+
+        await sendOtpEmail(trimmedEmail, otp, user.name);
+
+        res.status(200).json({ message: 'OTP sent successfully' });
+
+    } catch (error) {
+        console.error("Send OTP Error:", error);
+        res.status(500).json({ message: 'Server Error', error: error.message });
     }
 };
 
@@ -306,24 +737,47 @@ const login = async (req, res) => {
     try {
         const { email, password } = req.body;
         const trimmedEmail = email?.trim().toLowerCase();
+        console.log(`Login attempt for: ${trimmedEmail}, Password Length: ${password?.length}`);
 
-        const { data: user } = await supabase
+        const { data: user, error: userError } = await supabase
             .from('users')
             .select('*')
             .eq('email', trimmedEmail)
-            .single();
+            .maybeSingle();
+
+        if (userError) {
+            console.error('Supabase Login Error:', userError);
+        }
 
         if (!user) {
+            console.log(`Login failed: No user found with email ${trimmedEmail}`);
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
         const match = await bcrypt.compare(password, user.password);
         if (!match) {
+            console.log(`Login failed: Password mismatch for user ${trimmedEmail}`);
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
-        if (user.role === 'Coach') {
+        // Handle optional ID Card Upload during login
+        if (req.file && (user.role === 'Student' || user.role === 'College Student')) {
+            const ext = req.file.originalname.split('.').pop();
+            const fileName = `student_ids/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 
+            console.log("file name", fileName);
+
+            const { error: uploadError } = await supabase.storage
+                .from('documents')
+                .upload(fileName, req.file.buffer, { contentType: req.file.mimetype });
+
+            if (!uploadError) {
+                const id_proof_image = supabase.storage.from('documents').getPublicUrl(fileName).data.publicUrl;
+                await supabase.from('users').update({ id_proof_image }).eq('id', user.id);
+            }
+        }
+
+        if (user.role === 'Coach') {
             const { data: coach, error: coachError } = await supabase
                 .from('coaches')
                 .select('is_approved')
@@ -331,16 +785,54 @@ const login = async (req, res) => {
                 .maybeSingle();
 
             if (coachError || !coach) {
-                return res.status(403).json({
-                    message: 'Coach profile not found'
-                });
+                return res.status(403).json({ message: 'Coach profile not found' });
             }
 
             if (coach.is_approved === false) {
-                return res.status(403).json({
-                    message: 'Your account is pending admin approval'
-                });
+                return res.status(403).json({ message: 'Your account is pending admin approval' });
             }
+        }
+
+        // Student Approval Logic
+        if (user.role === 'Student' || user.role === 'College Student') {
+            // Check for verification/activation
+            if (!user.is_active && !trimmedEmail.endsWith('.edu')) {
+                return res.status(403).json({ message: 'Your student account is pending admin approval' });
+            }
+
+            // The user wants students to get OTP on login (and .edu students bypass admin approval)
+            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+            // Delete any existing verification tokens for this user
+            await supabase
+                .from('user_tokens')
+                .delete()
+                .eq('user_id', user.id)
+                .eq('token_type', 'email_verify');
+
+            // Insert new token
+            const { error: tokenError } = await supabase
+                .from('user_tokens')
+                .insert([{
+                    user_id: user.id,
+                    token: otp,
+                    token_type: 'email_verify',
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (tokenError) throw tokenError;
+
+            try {
+                await sendOtpEmail("shubham.dubeyargos@gmail.com", otp, user.name);
+            } catch (err) {
+                console.error("Failed to send OTP email:", err);
+            }
+
+            return res.status(200).json({
+                message: 'OTP sent to your email for login verification.',
+                requireOtp: true,
+                email: user.email
+            });
         }
 
         console.log("Login Successful, generating token.");
@@ -691,4 +1183,6 @@ module.exports = {
     updateUserProfile,
     getUserProfile,
     updateProfileImage,
+    verifyOtp,
+    sendOtp,
 };

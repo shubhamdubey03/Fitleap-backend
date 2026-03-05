@@ -9,7 +9,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const { protect } = require('../middleware/authMiddleware');
 
-router.post('/signup-user', signupUser);
+router.post('/signup-user', upload.single('idCard'), signupUser);
 router.post('/signup', upload.fields([
     { name: 'nutrition', maxCount: 1 },
     { name: 'aadharCard', maxCount: 1 },
@@ -21,6 +21,8 @@ router.post('/forgot-password', forgotPassword);
 router.post('/verify-reset-token', verifyResetToken);
 router.post('/reset-password', resetPassword);
 router.post('/reset-password/:token', resetPassword);
+router.post('/verify-otp', require('../controllers/authController').verifyOtp);
+router.post('/send-otp', require('../controllers/authController').sendOtp);
 router.post('/google-simple', require('../controllers/authController').googleLoginSimple);
 router.put('/update-profile', protect, upload.single('profileImage'), require('../controllers/authController').updateUserProfile);
 router.get('/profile', protect, require('../controllers/authController').getUserProfile);

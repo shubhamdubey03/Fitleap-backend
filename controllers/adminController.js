@@ -71,7 +71,7 @@ const getAllUsers = async (req, res) => {
         const { data, error } = await supabase
             .from('users')
             .select('*')
-            .eq('role', 'User') // Filter: Only show standard users, not coaches/admins
+            .in('role', ['User', 'Student']) // Show both standard users and students
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -82,8 +82,54 @@ const getAllUsers = async (req, res) => {
     }
 };
 
+// @desc    Get all Student Requests (pending approval)
+// @route   GET /api/admin/student-requests
+// @access  Private (Admin)
+const getStudentRequests = async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('role', 'Student')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        res.json({ data });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error', error: error.message });
+    }
+};
+
+// @desc    Approve Student
+// @route   PUT /api/admin/approve-student/:id
+// @access  Private (Admin)
+const approveStudent = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { data, error } = await supabase
+            .from('users')
+            .update({ is_active: true })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json({
+            message: 'Student approved successfully',
+            user: data
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
 module.exports = {
-    getAllCoaches, // Renamed from getApprovedCoach
+    getAllCoaches,
     getAllUsers,
     approveCoach,
+    getStudentRequests,
+    approveStudent,
 };
