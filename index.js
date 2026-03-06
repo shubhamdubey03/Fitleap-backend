@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 dotenv.config();
 const path = require('path');
+require("./controllers/cron/reminderCron");
 
 
 const orderRoutes = require("./routes/orderRoutes");
@@ -17,6 +18,11 @@ const messageRoutes = require("./routes/chatRoute/messageRoutes");
 const workoutRoutes = require('./routes/workRoutes/workRoutes');
 const workoutCategoryRoutes = require('./routes/workRoutes/workoutCategoryRoutes');
 const dietController = require("./routes/userRoute/userRoutes");
+const habitRoutes = require('./routes/habitRoute/habitRoutes');
+const reminderRoutes = require('./routes/habitRoute/reminderRoutes');
+const habitLogRoutes = require('./routes/habitRoute/habitLogRoutes');
+
+
 
 
 
@@ -58,6 +64,9 @@ app.use('/api/v1/appointments', require('./routes/agoraRoutes/appointments.route
 app.use('/api/workouts', workoutRoutes);
 app.use('/api/workout-categories', workoutCategoryRoutes);
 app.use('/api/diet', dietController);
+app.use('/api', habitRoutes);
+app.use('/api', reminderRoutes);
+app.use('/api', habitLogRoutes);
 
 
 app.get('/', (req, res) => {

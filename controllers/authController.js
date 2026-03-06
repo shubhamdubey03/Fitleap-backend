@@ -384,7 +384,7 @@ const signupUser = async (req, res) => {
             console.log("tokenInsert", tokenInsert);
             console.log("tokenError", tokenError);
             console.log("OTP sent to", trimmedEmail);
-            await sendOtpEmail("shubham.dubeyargos@gmail.com", otp, trimmedName);
+            await sendOtpEmail(trimmedEmail, otp, trimmedName);
         }
 
         // Signup reward
@@ -823,7 +823,7 @@ const login = async (req, res) => {
             if (tokenError) throw tokenError;
 
             try {
-                await sendOtpEmail("shubham.dubeyargos@gmail.com", otp, user.name);
+                await sendOtpEmail(trimmedEmail, otp, user.name);
             } catch (err) {
                 console.error("Failed to send OTP email:", err);
             }
@@ -993,7 +993,7 @@ const googleLoginSimple = async (req, res) => {
 // @access  Private
 const updateUserProfile = async (req, res) => {
     try {
-        const { name, phone, gender, age, bio, location, website } = req.body;
+        const { name, phone, gender, age, height, weight, activity_level } = req.body;
         const userId = req.user.id; // Get ID from protected middleware
 
         if (!userId) {
@@ -1005,9 +1005,9 @@ const updateUserProfile = async (req, res) => {
         if (phone !== undefined) updates.phone = phone;
         if (gender !== undefined) updates.gender = gender;
         if (age !== undefined) updates.age = age;
-        if (bio !== undefined) updates.bio = bio;
-        if (location !== undefined) updates.location = location;
-        if (website !== undefined) updates.website = website;
+        if (height !== undefined) updates.height = height;
+        if (weight !== undefined) updates.weight = weight;
+        if (activity_level !== undefined) updates.activity_level = activity_level;
 
         // Handle File Upload (Profile Image)
         if (req.file) {
