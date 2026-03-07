@@ -128,6 +128,7 @@ const getUserNotifications = async (req, res) => {
             .from('notifications')
             .select('*')
             .or(`user_id.eq.${userId},type.eq.broadcast`)
+            .eq('is_read', false)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -143,6 +144,7 @@ const getUserNotifications = async (req, res) => {
 const markAsRead = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user.id;
         const { error } = await supabase
             .from('notifications')
             .update({ is_read: true })

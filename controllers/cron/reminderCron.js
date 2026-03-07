@@ -4,11 +4,24 @@ const admin = require("../../config/firebase");
 const dayjs = require("dayjs");
 
 cron.schedule("* * * * *", async () => {
-    console.log("cron is running")
-    try {
-        const now = dayjs().toISOString();
 
-        const { data, error } = await supabase
+    console.log("cron is running");
+
+    try {
+
+        const now = dayjs().toISOString();
+        const today = dayjs().format("YYYY-MM-DD");
+        console.log("now", now);
+        const hour = dayjs().hour();
+        console.log("hour", hour);
+
+        const day_frequency = {
+            8: "morning",
+            12: "afternoon",
+            19: "evening"
+        }
+
+        const { data: reminders, error } = await supabase
             .from("habit_reminders")
             .select(`
                 id,
@@ -18,120 +31,159 @@ cron.schedule("* * * * *", async () => {
                     habit_name,
                     frequency,
                     user_id,
+                    is_morning,
+                    is_afternoon,
+                    is_evening,
                     users (
                         fcm_token,
                         name
                     )
                 )
             `)
-            .lte("reminder_datetime", now)
-            .eq("is_sent", true)
-            .eq("is_enabled", true);
-        console.log("iiiiii", error)
-        console.log(";;;;;;", data)
+            .eq("day_frequency", day_frequency[hour])
+            .eq("is_enabled", true)
+            .eq("is_sent", false);
+        console.log("dataeeeeeeeee", reminders)
+        console.log("error", error)
         if (error) throw error;
 
-        if (data && data.length > 0) {
-            for (const reminder of data) {
+        if (!reminders || reminders.length === 0) return;
 
-                const habit = reminder.habits;
-                if (!habit) continue;
+        for (const reminder of reminders) {
 
-                const user = habit.users;
-                const habitName = habit.habit_name;
-                const frequency = habit.frequency;
-                const userId = habit.user_id;
-                const fcmToken = user?.fcm_token;
+            const habit = reminder.habits;
+            if (!habit) continue;
 
-                const title = "Habit Reminder";
-                const body = `Time to work on your habit: ${habitName}`;
+            const habitId = reminder.habit_id;
+            const userId = habit.user_id;
+            const habitName = habit.habit_name;
+            const frequency = habit.frequency;
+            const fcmToken = habit.users?.fcm_token;
 
-                console.log(`Reminder triggered for ${habitName}`);
+            // check habit already completed today
+            const { data: completed } = await supabase
+                .from("habit_logs")
+                .select("id")
+                .eq("habit_id", habitId)
+                .eq("completed_date", today)
+                .maybeSingle();
 
-                // Save notification in DB
+            if (completed) {
                 await supabase
-                    .from("notifications")
-                    .insert([{
-                        user_id: userId,
+                    .from("habit_reminders")
+                    .update({ is_sent: true })
+                    .eq("habit_id", habitId)
+                    .eq("day_frequency", day_frequency[hour]);
+            }
+
+            const title = "Habit Reminder";
+            const body = `Time to work on your habit: ${habitName}`;
+
+            // save notification
+            console.log("userId", userId);
+            await supabase
+                .from("notifications")
+                .insert({
+                    user_id: userId,
+                    title,
+                    body,
+                    type: "broadcast",
+                    data: { habit_id: habitId },
+                    is_read: false
+                });
+
+            // send push notification
+            if (fcmToken && admin.apps.length) {
+
+                const message = {
+                    token: fcmToken,
+                    notification: {
                         title,
-                        body,
-                        type: "reminder",
-                        data: { habit_id: reminder.habit_id },
-                        is_read: false
-                    }]);
-
-                // Send push notification
-                if (fcmToken && admin.apps.length) {
-
-                    const message = {
-                        token: fcmToken,
-
-                        // Shows notification in BACKGROUND + QUIT
-                        notification: {
-                            title: title,
-                            body: body
-                        },
-
-                        // Used for FOREGROUND handling
-                        data: {
-                            habit_id: String(reminder.habit_id),
-                            type: "reminder",
-                            title: title,
-                            body: body
-                        },
-
-                        android: {
-                            priority: "high",
-                            notification: {
-                                channelId: "default",
-                                sound: "default", priority: "max",
-                                visibility: "public"
-                            }
-                        },
-
-                        apns: {
-                            payload: {
-                                aps: {
-                                    sound: "default"
-                                }
-                            }
-                        }
-                    };
-
-                    try {
-                        await admin.messaging().send(message);
-                        console.log(`✅ Notification sent to user ${userId}`);
-                    } catch (err) {
-                        console.log("FCM error:", err.message);
+                        body
+                    },
+                    data: {
+                        habit_id: String(habitId),
+                        type: "broadcast"
                     }
-                }
+                };
 
-                // Handle recurrence
-                if (frequency === "daily" || frequency === "weekly" || frequency === "monthly") {
-
-                    let nextDate = dayjs(reminder.reminder_datetime);
-
-                    if (frequency === "daily") nextDate = nextDate.add(1, "day");
-                    if (frequency === "weekly") nextDate = nextDate.add(1, "week");
-                    if (frequency === "monthly") nextDate = nextDate.add(1, "month");
-
-                    await supabase
-                        .from("habit_reminders")
-                        .update({ reminder_datetime: nextDate.toISOString() })
-                        .eq("id", reminder.id);
-
-                } else {
-
-                    await supabase
-                        .from("habit_reminders")
-                        .update({ is_sent: true })
-                        .eq("id", reminder.id);
-
+                try {
+                    await admin.messaging().send(message);
+                    console.log("Notification sent");
+                } catch (err) {
+                    console.log("FCM error:", err.message);
                 }
             }
+
+            // update next reminder
+            let nextDate = dayjs(reminder.reminder_datetime);
+
+            if (frequency === "daily") nextDate = nextDate.add(1, "day");
+            else if (frequency === "weekly") nextDate = nextDate.add(1, "week");
+            else if (frequency === "monthly") nextDate = nextDate.add(1, "month");
+            else nextDate = nextDate.add(1, "day"); // Default to daily if frequency unknown
+
+            await supabase
+                .from("habit_reminders")
+                .update({
+                    is_sent: true,
+                })
+                .eq("id", reminder.id)
+                .eq("day_frequency", day_frequency[hour]);
+
+            if (habit.is_morning) {
+                const { data, error } = await supabase
+                    .from("habit_reminders")
+                    .insert([
+                        {
+                            habit_id: habitId,
+                            reminder_datetime: nextDate.toISOString(),
+                            day_frequency: "morning",
+                            is_sent: false,
+                        }
+                    ])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+            }
+            if (habit.is_afternoon) {
+                const { data, error } = await supabase
+                    .from("habit_reminders")
+                    .insert([
+                        {
+                            habit_id: habitId,
+                            reminder_datetime: nextDate.toISOString(),
+                            day_frequency: "afternoon",
+                            is_sent: false,
+                        }
+                    ])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+            }
+            if (habit.is_evening) {
+                const { data, error } = await supabase
+                    .from("habit_reminders")
+                    .insert([
+                        {
+                            habit_id: habitId,
+                            reminder_datetime: nextDate.toISOString(),
+                            day_frequency: "evening",
+                            is_sent: false,
+                        }
+                    ])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+            }
+
         }
 
     } catch (err) {
         console.error("Cron error:", err.message);
     }
+
 });

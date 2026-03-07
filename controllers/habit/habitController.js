@@ -1,10 +1,14 @@
 const supabase = require('../../config/supabase');
+const reminderController = require('./reminderController');
+
 
 exports.createHabit = async (req, res) => {
     try {
 
         const user_id = req.user.id;
-        const { habit_name, frequency } = req.body;
+        const { habit_name, frequency, is_morning, is_afternoon, is_evening } = req.body;
+
+        console.log(req.body);
 
         if (!habit_name || !frequency) {
             return res.status(400).json({
@@ -15,21 +19,28 @@ exports.createHabit = async (req, res) => {
 
         const { data, error } = await supabase
             .from('habits')
-            .insert([{ user_id, habit_name, frequency }])
+            .insert([{ user_id, habit_name, frequency, is_morning, is_afternoon, is_evening }])
             .select()
             .single();
 
         if (error) throw error;
 
-        res.status(201).json({
-            success: true,
-            message: "Habit created successfully",
-            data
-        });
+        req.body.habit_id = data.id;
+
+        console.log("datawwwwwwwwwwwwwwwwwwwww", data)
+        await reminderController.addReminder(req, res);
+
+        // res.status(201).json({
+        //     success: true,
+        //     message: "Habit created successfully",
+        //     data
+        // });
+
 
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
+
 };
 
 
@@ -85,11 +96,11 @@ exports.updateHabit = async (req, res) => {
     try {
 
         const { id } = req.params;
-        const { habit_name, frequency } = req.body;
+        const { habit_name, frequency, is_morning, is_afternoon, is_evening } = req.body;
 
         const { data, error } = await supabase
             .from('habits')
-            .update({ habit_name, frequency })
+            .update({ habit_name, frequency, is_morning, is_afternoon, is_evening })
             .eq('id', id)
             .select()
             .single();

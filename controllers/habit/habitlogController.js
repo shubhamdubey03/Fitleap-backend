@@ -24,7 +24,7 @@ exports.completeHabit = async (req, res) => {
             ])
             .select()
             .single();
-
+        console.log("dataaaaaaaa", data)
         if (error) throw error;
 
         res.json({
