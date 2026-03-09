@@ -18,8 +18,10 @@ cron.schedule("* * * * *", async () => {
         const day_frequency = {
             8: "morning",
             12: "afternoon",
-            19: "evening"
+            18: "evening"
         }
+        const todayStart = dayjs().startOf("day").toISOString();
+        const todayEnd = dayjs().endOf("day").toISOString();
 
         const { data: reminders, error } = await supabase
             .from("habit_reminders")
@@ -41,6 +43,8 @@ cron.schedule("* * * * *", async () => {
                 )
             `)
             .eq("day_frequency", day_frequency[hour])
+            .gte("reminder_datetime", todayStart)
+            .lte("reminder_datetime", todayEnd)
             .eq("is_enabled", true)
             .eq("is_sent", false);
         console.log("dataeeeeeeeee", reminders)
@@ -128,8 +132,7 @@ cron.schedule("* * * * *", async () => {
                 .update({
                     is_sent: true,
                 })
-                .eq("id", reminder.id)
-                .eq("day_frequency", day_frequency[hour]);
+                .eq("id", reminder.id);
 
             if (habit.is_morning) {
                 const { data, error } = await supabase
