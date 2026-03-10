@@ -3,7 +3,7 @@ const supabase = require("../../config/supabase");
 const admin = require("../../config/firebase");
 const dayjs = require("dayjs");
 
-cron.schedule("* * * * *", async () => {
+cron.schedule("30 * * * *", async () => {
 
     console.log("cron is running");
 
@@ -16,9 +16,9 @@ cron.schedule("* * * * *", async () => {
         console.log("hour", hour);
 
         const day_frequency = {
-            8: "morning",
-            12: "afternoon",
-            18: "evening"
+            0: "morning",
+            0: "afternoon",
+            0: "evening"
         }
         const todayStart = dayjs().startOf("day").toISOString();
         const todayEnd = dayjs().endOf("day").toISOString();

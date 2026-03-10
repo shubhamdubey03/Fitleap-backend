@@ -8,17 +8,13 @@ const createOrder = async (req, res) => {
         const { items, address_id, use_coins } = req.body;
         console.log("Request Body:", req.body);
 
-
         // 1️⃣ Calculate cart total
         let cartTotal = 0;
-
         items.forEach(item => {
-            const price = item.price * item.quantity;
-            // Removed 5% tax addition here to match frontend totals
-            cartTotal += price;
+            cartTotal += item.price * item.quantity;
         });
 
-        // 2️⃣ Get user wallet
+        // 2️⃣ Get user wallet balance
         const { data: user, error: userError } = await supabase
             .from("users")
             .select("wallet_balance")
@@ -26,39 +22,29 @@ const createOrder = async (req, res) => {
             .single();
 
         if (userError) throw userError;
-
         const userWallet = user.wallet_balance || 0;
-        console.log("userWallet", userWallet);
 
-        // 3️⃣ Apply 25% rule if toggled
-        // Logic: Pay using up to 25% of your TOTAL WALLET BALANCE, capped by the cart total
+        // 3️⃣ Calculate pricing for response only (estimated)
         const maxCoinUsageAllowed = parseFloat((userWallet * 0.25).toFixed(2));
         const walletUsed = use_coins ? Math.min(maxCoinUsageAllowed, cartTotal) : 0;
         const finalPayable = parseFloat((cartTotal - walletUsed).toFixed(2));
-
-        console.log(`--- Order Coin Calculation ---`);
-        console.log(`Cart Total: ₹${cartTotal}`);
-        console.log(`User Wallet: ${userWallet} coins`);
-        console.log(`Max Usage Allowed (25% of wallet): ${maxCoinUsageAllowed}`);
-        console.log(`Actually Used: ${walletUsed} coins`);
-        console.log(`Final Payable: ₹${finalPayable}`);
-        console.log(`------------------------------`);
+        console.log("finalPayable", finalPayable);
+        console.log("walletUsed", walletUsed);
+        console.log("cartTotal", cartTotal);
+        console.log("items", finalPayable);
         const ordersData = items.map(item => {
             const price = item.price * item.quantity;
-            const tax = 0; // Tax already included in price
-            const total_price = price;
-
             return {
                 user_id,
                 product_id: item.product_id,
                 quantity: item.quantity,
                 unit_price: item.price,
                 price,
-                tax,
-                wallet_used: walletUsed / items.length, // optional split
-                total_price: total_price - (walletUsed / items.length),
+                tax: 0,
+                wallet_used: walletUsed, // Will be updated in verifyPayment
+                total_price: finalPayable, // Store full price for now
                 status: "pending",
-                address_id
+                address_id,
             };
         });
         console.log("ordersData", ordersData);
@@ -68,18 +54,8 @@ const createOrder = async (req, res) => {
             .select();
 
         if (error) throw error;
-        if (walletUsed > 0) {
-            const finalWallet = parseFloat((userWallet - walletUsed).toFixed(2));
-            console.log("finalWallet", finalWallet);
-            console.log("Wallet Used", walletUsed);
-            await supabase
-                .from("users")
-                .update({ wallet_balance: finalWallet })
-                .eq("id", user_id);
-        }
 
         // 5️⃣ Send Final Response
-        // This is the ONLY response that should be sent in this function
         return res.status(201).json({
             orders: data,
             cartTotal,
@@ -112,7 +88,9 @@ const updateOrderStatus = async (req, res) => {
 };
 const createProduct = async (req, res) => {
     try {
-        const { name, description, price, stock, category } = req.body;
+        console.log("Create Product Body:", req.body);
+        const { name, description, price, stock, category, gst_percent } = req.body;
+
         let image_url = req.body.image_url;
 
         // Handle File Upload
@@ -134,11 +112,29 @@ const createProduct = async (req, res) => {
             image_url = publicData.publicUrl;
         }
 
+        const inputPrice = parseFloat(price);
+        const inputGstPercent = parseFloat(gst_percent) || 0;
+        const gst_amount = (inputPrice * inputGstPercent) / 100;
+        const net_price = inputPrice - gst_amount;
+
+        console.log("Calculated Net Price:", net_price);
+        console.log("Calculated GST Amount:", gst_amount);
+
         const { data, error } = await supabase
             .from("products")
-            .insert({ name, description, price, stock, image_url, category })
+            .insert({
+                name,
+                description,
+                price: net_price,
+                stock,
+                image_url,
+                category,
+                gst_percent: inputGstPercent,
+            })
             .select()
             .single();
+
+
 
         if (error) throw error;
 
@@ -150,10 +146,12 @@ const createProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
     try {
+        console.log("Update Product Body:", req.body);
         const { id } = req.params;
-        const { name, description, price, stock, category } = req.body;
-        let image_url = req.body.image_url;
 
+        const { name, description, price, stock, category, gst_percent } = req.body;
+        let image_url = req.body.image_url;
+        console.log("kkkk", gst_percent)
         // Handle File Upload (Optional update)
         if (req.file) {
             const fileName = `product_${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9]/g, '_')}`;
@@ -180,6 +178,25 @@ const updateProduct = async (req, res) => {
         if (stock !== undefined) updates.stock = stock;
         if (category !== undefined) updates.category = category;
         if (image_url !== undefined) updates.image_url = image_url;
+        if (gst_percent !== undefined) updates.gst_percent = gst_percent;
+        console.log("updates", updates)
+
+        // Recalculate gst_amount and net price if price or gst_percent is updated
+        if (price !== undefined || gst_percent !== undefined) {
+            const currentPrice = parseFloat(price !== undefined ? price : req.body.price);
+            const currentGst = parseFloat(gst_percent !== undefined ? gst_percent : req.body.gst_percent);
+
+            if (!isNaN(currentPrice) && !isNaN(currentGst)) {
+                const gst_amount = (currentPrice * currentGst) / 100;
+                const net_price = currentPrice - gst_amount;
+
+                updates.price = net_price
+                updates.gst_percent = currentGst;
+
+                console.log("Updated Net Price:", net_price);
+                console.log("Updated GST Amount:", gst_amount);
+            }
+        }
 
         const { data, error } = await supabase
             .from("products")
@@ -189,6 +206,7 @@ const updateProduct = async (req, res) => {
             .single();
 
         if (error) throw error;
+        console.log("Updated Product Data:", data);
 
         res.json(data);
     } catch (err) {

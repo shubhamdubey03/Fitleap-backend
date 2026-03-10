@@ -9,7 +9,7 @@ const createPaymentOrder = async (req, res) => {
         const { order_id, amount } = req.body;
 
         const razorOrder = await razorpay.orders.create({
-            amount: amount * 100, // Amount in paise (multiply by 100)
+            amount: Math.round(amount * 100), // Amount in paise (multiply by 100) and MUST be an integer
             currency: "INR"
         });
         console.log("user_id", req.user);
@@ -121,36 +121,109 @@ const verifyPayment = async (req, res) => {
             return res.status(400).json({ error: "Invalid payment signature" });
         }
 
-        // 📦 Update payment in DB
+        console.log("************************Payment Signature Verified************************");
+
+        // 📦 Update payment record status
         await supabase
             .from("payments")
             .update({ status: "success" })
             .eq("razorpay_order_id", razorpay_order_id);
 
-        await supabase
-            .from("orders")
-            .update({ status: "paid" })
-            .eq("id", orderId);
-
-        // fetching order details
+        // 🪙 WALLET DEDUCTION LOGIC
+        // We fetch the order to see if 'use_coins' was intented
         const { data: order, error: orderError } = await supabase
             .from("orders")
-            .select(`
-                *,
-                products: product_id(*)
-            `)
+            .select(
+                `wallet_used, 
+                price, 
+                user_id, 
+                id, 
+                total_price, 
+                reward_given, 
+                product_id, 
+                products (id, name, price,gst_percent, description)`)
             .eq("id", orderId)
             .single();
 
-        if (!order.reward_given) {
-            await updateReward(order.user_id, 'market', order.total_price);
+        if (orderError) throw orderError;
 
-            await supabase
-                .from('orders')
-                .update({ reward_given: true })
-                .eq('id', order.id);
+        if (order && order.wallet_used) {
+            const { data: user } = await supabase
+                .from("users")
+                .select("wallet_balance")
+                .eq("id", order.user_id)
+                .single();
+
+            if (user) {
+                // Perform the 25% calculation based on balance CURRENTLY
+                // const cartTotal = order.price;
+                // const maxCoinUsage = parseFloat((user.wallet_balance * 0.25).toFixed(2));
+                // const walletToDeduct = Math.min(maxCoinUsage, cartTotal);
+
+                // if (walletToDeduct > 0) {
+                //     const newBalance = Math.max(0, parseFloat((user.wallet_balance - walletToDeduct).toFixed(2)));
+
+                const toBeAddedTotalPrice = user.wallet_balance + (order.total_price * 0.05);
+                console.log("toBeAddedTotalPrice", toBeAddedTotalPrice);
+
+                const finalUserWallet = toBeAddedTotalPrice - order.wallet_used;
+                console.log("finalUserWallet", finalUserWallet);
+
+                // 1. Deduct from User Wallet
+                await supabase
+                    .from("users")
+                    .update({ wallet_balance: finalUserWallet })
+                    .eq("id", order.user_id);
+
+                // 2. Update Order Record with the applied discount
+                await supabase
+                    .from("orders")
+                    .update({
+                        status: "paid"
+                    })
+                    .eq("id", orderId);
+
+
+
+                console.log(`[PAYMENT VERIFIED] Deducted ${order.wallet_used} coins. Order ${orderId} marked as paid.`);
+            } else {
+                await supabase.from("orders").update({ status: "paid" }).eq("id", orderId);
+            }
         }
-        console.log("orderqqqqqqqqqqqqqq", order);
+        // } else {
+        //     // If coins were not used, just mark as paid
+        //     await supabase.from("orders").update({ status: "paid" }).eq("id", orderId);
+        // }
+
+        // if (order && !order.reward_given) {
+        //     // 💰 5% CASHBACK REWARD: Calculate and add to wallet
+        //     const rewardAmount = parseFloat((order.total_price * 0.05).toFixed(2));
+
+        //     const { data: userForReward } = await supabase
+        //         .from("users")
+        //         .select("wallet_balance")
+        //         .eq("id", order.user_id)
+        //         .single();
+
+        //     if (userForReward) {
+        //         const finalBalance = parseFloat((userForReward.wallet_balance + rewardAmount).toFixed(2));
+        //         await supabase
+        //             .from("users")
+        //             .update({ wallet_balance: finalBalance })
+        //             .eq("id", order.user_id);
+
+        //         console.log(`[REWARD] 5% Cashback added: ${rewardAmount} coins to User: ${order.user_id}`);
+        //     }
+
+        //     // Existing reward logic if any
+        //     await updateReward(order.user_id, 'market', order.total_price);
+
+        //     await supabase
+        //         .from('orders')
+        //         .update({ reward_given: true })
+        //         .eq('id', order.id);
+        // }
+        // console.log("orderqqqqqqqqqqqqqq", order);
 
         const fileName = `invoice-${order.id}.pdf`;
         const filePath = require('path').join(__dirname, '../invoices', fileName);

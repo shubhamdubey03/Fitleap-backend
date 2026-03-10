@@ -21,6 +21,9 @@ const dietController = require("./routes/userRoute/userRoutes");
 const habitRoutes = require('./routes/habitRoute/habitRoutes');
 const reminderRoutes = require('./routes/habitRoute/reminderRoutes');
 const habitLogRoutes = require('./routes/habitRoute/habitLogRoutes');
+const programRoutes = require('./routes/programRoute/programsRoutes');
+const pcRoutes = require("./routes/programRoute/programsRoutes");
+const subscriptionRoutes = require("./routes/programRoute/subscriptionRoutes");
 
 
 
@@ -67,7 +70,9 @@ app.use('/api/diet', dietController);
 app.use('/api', habitRoutes);
 app.use('/api', reminderRoutes);
 app.use('/api', habitLogRoutes);
-
+app.use("/api", programRoutes);
+app.use("/api/pc", pcRoutes);
+app.use("/api/pc", subscriptionRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');
