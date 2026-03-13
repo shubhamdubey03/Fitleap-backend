@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const sendApprovalEmail = require('../email/sendApprovalEmail');
 
 // @desc    Get all Coaches
 // @route   GET /api/admin/coaches
@@ -51,6 +52,17 @@ const approveCoach = async (req, res) => {
             .single();
 
         if (error) throw error;
+
+        // Fetch coach user details for email
+        const { data: coachUser } = await supabase
+            .from('coaches')
+            .select('user_id, users:user_id (name, email)')
+            .eq('id', id)
+            .single();
+
+        if (coachUser && coachUser.users) {
+            await sendApprovalEmail(coachUser.users.email, coachUser.users.name, 'Coach');
+        }
 
         res.json({
             message: 'Coach approved successfully',
@@ -116,6 +128,11 @@ const approveStudent = async (req, res) => {
             .single();
 
         if (error) throw error;
+
+        // Send email to student
+        if (data && data.email) {
+            await sendApprovalEmail(data.email, data.name, data.role || 'Student');
+        }
 
         res.json({
             message: 'Student approved successfully',
