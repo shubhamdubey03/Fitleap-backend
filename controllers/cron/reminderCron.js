@@ -16,9 +16,9 @@ cron.schedule("30 * * * *", async () => {
         console.log("hour", hour);
 
         const day_frequency = {
-            0: "morning",
-            0: "afternoon",
-            0: "evening"
+            6: "morning",
+            12: "afternoon",
+            18: "evening"
         }
         const todayStart = dayjs().startOf("day").toISOString();
         const todayEnd = dayjs().endOf("day").toISOString();
