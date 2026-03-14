@@ -1000,6 +1000,14 @@ const updateUserProfile = async (req, res) => {
             return res.status(400).json({ message: 'User not found in token' });
         }
 
+        // Validation: Age and weight should not be negative
+        if (age !== undefined && parseFloat(age) < 0) {
+            return res.status(400).json({ message: 'Age cannot be negative' });
+        }
+        if (weight !== undefined && parseFloat(weight) < 0) {
+            return res.status(400).json({ message: 'Weight cannot be negative' });
+        }
+
         const updates = {};
         if (name !== undefined) updates.name = name;
         if (phone !== undefined) updates.phone = phone;
