@@ -78,7 +78,7 @@ const createVendor = async (req, res) => {
             message: "Vendor created successfully",
             login_password: rawPassword
         });
-        await sendVendorEmail("shubham.dubeyargos@gmail.com", rawPassword, name);
+        await sendVendorEmail(email, rawPassword, name);
 
 
     } catch (err) {
