@@ -1007,6 +1007,9 @@ const updateUserProfile = async (req, res) => {
         if (weight !== undefined && parseFloat(weight) < 0) {
             return res.status(400).json({ message: 'Weight cannot be negative' });
         }
+        if (height !== undefined && parseFloat(height) < 0) {
+            return res.status(400).json({ message: 'Height cannot be negative' });
+        }
 
         const updates = {};
         if (name !== undefined) updates.name = name;
