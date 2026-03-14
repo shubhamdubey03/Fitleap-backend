@@ -21,11 +21,15 @@ const createVendor = async (req, res) => {
             state_id
         } = req.body;
 
+        const cleanEmail = email.trim().toLowerCase();
+
         const { data: existingUser } = await supabase
             .from('users')
             .select('id')
-            .eq('email', email)
-            .single();
+            .eq('email', cleanEmail)
+            .maybeSingle();
+
+        console.log("----", existingUser)
 
         if (existingUser) {
             return res.status(400).json({
@@ -42,7 +46,7 @@ const createVendor = async (req, res) => {
             .from('users')
             .insert([{
                 name,
-                email,
+                email: cleanEmail,
                 phone: mobile,
                 password: hashedPassword,
                 role: 'vendor',
@@ -69,12 +73,13 @@ const createVendor = async (req, res) => {
             }]);
 
         if (addressError) throw addressError;
-        await sendVendorEmail(email, rawPassword, name);
         res.json({
             success: true,
             message: "Vendor created successfully",
             login_password: rawPassword
         });
+        await sendVendorEmail("shubham.dubeyargos@gmail.com", rawPassword, name);
+
 
     } catch (err) {
         console.error(err);
@@ -92,14 +97,7 @@ const getVendors = async (req, res) => {
 
         if (error) throw error;
 
-        // Mocking rating and revenue for now since it might not be in the database yet
-        const enrichedVendors = vendors.map(v => ({
-            ...v,
-            rating: (Math.random() * (5.0 - 4.0) + 4.0).toFixed(1),
-            revenue: '$' + Math.floor(Math.random() * 20000 + 5000).toLocaleString()
-        }));
-
-        res.json(enrichedVendors);
+        res.json(vendors);
     } catch (err) {
         console.error('Fetch vendors error:', err);
         res.status(500).json({ error: 'Failed to fetch vendors' });

@@ -143,10 +143,65 @@ const approveStudent = async (req, res) => {
     }
 };
 
+const rejectCoach = async (req, res) => {
+    try {
+        const { id } = req.params; // coach table id
+
+        // Get user_id first to delete from users table too
+        const { data: coach } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', id)
+            .maybeSingle();
+        if (!coach) {
+            return res.status(404).json({ message: 'Coach not found' });
+        }
+
+        // Delete from coaches table
+        const { error: coachDeleteError } = await supabase
+            .from('coaches')
+            .delete()
+            .eq('user_id', id);
+
+        if (coachDeleteError) throw coachDeleteError;
+
+        // Delete from users table
+        const { error: userDeleteError } = await supabase
+            .from('users')
+            .delete()
+            .eq('id', id);
+
+        if (userDeleteError) throw userDeleteError;
+
+        res.json({ message: 'Coach request rejected and deleted' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+const rejectStudent = async (req, res) => {
+    try {
+        const { id } = req.params; // user id
+
+        const { error } = await supabase
+            .from('users')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
+        res.json({ message: 'Student request rejected and deleted' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
 module.exports = {
     getAllCoaches,
     getAllUsers,
     approveCoach,
     getStudentRequests,
     approveStudent,
+    rejectCoach,
+    rejectStudent,
 };
