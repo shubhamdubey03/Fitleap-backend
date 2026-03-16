@@ -89,15 +89,34 @@ const createVendor = async (req, res) => {
 
 const getVendors = async (req, res) => {
     try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const startIndex = (page - 1) * limit;
+
+        // Get total count
+        const { count, error: countError } = await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true })
+            .eq('role', 'vendor');
+
+        if (countError) throw countError;
+
         const { data: vendors, error } = await supabase
             .from('users')
             .select('id, name, email, phone, category')
             .eq('role', 'vendor')
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .range(startIndex, startIndex + limit - 1);
 
         if (error) throw error;
 
-        res.json(vendors);
+        res.json({
+            data: vendors || [],
+            page,
+            limit,
+            total: count || 0,
+            totalPages: Math.ceil((count || 0) / limit)
+        });
     } catch (err) {
         console.error('Fetch vendors error:', err);
         res.status(500).json({ error: 'Failed to fetch vendors' });

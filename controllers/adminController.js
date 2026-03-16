@@ -6,15 +6,35 @@ const sendApprovalEmail = require('../email/sendApprovalEmail');
 // @access  Private (Admin)
 const getAllCoaches = async (req, res) => {
     try {
-        const { data, error } = await supabase
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const search = req.query.search || '';
+        const startIndex = (page - 1) * limit;
+
+        let query = supabase
             .from('coaches')
             .select(`
                 *,
-                users:user_id (name, email, phone, profile_image)
-            `); // Removed filter .eq('is_approved', true) since approval is removed
+                users:user_id!inner(name, email, phone, profile_image)
+            `, { count: 'exact' });
+
+        if (search) {
+            query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`, { foreignTable: 'users' });
+        }
+
+        const { data, count, error } = await query
+            .order('created_at', { ascending: false })
+            .range(startIndex, startIndex + limit - 1);
 
         if (error) throw error;
-        res.json({ data });
+
+        res.json({
+            data: data || [],
+            page,
+            limit,
+            total: count || 0,
+            totalPages: Math.ceil((count || 0) / limit)
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error', error: error.message });
@@ -99,14 +119,35 @@ const getAllUsers = async (req, res) => {
 // @access  Private (Admin)
 const getStudentRequests = async (req, res) => {
     try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const startIndex = (page - 1) * limit;
+
+        // Get total count
+        const { count, error: countError } = await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true })
+            .eq('role', 'Student')
+            .eq('is_active', false);
+
+        if (countError) throw countError;
+
         const { data, error } = await supabase
             .from('users')
             .select('*')
             .eq('role', 'Student')
-            .order('created_at', { ascending: false });
+            .eq('is_active', false)
+            .order('created_at', { ascending: false })
+            .range(startIndex, startIndex + limit - 1);
 
         if (error) throw error;
-        res.json({ data });
+        res.json({
+            data: data || [],
+            page,
+            limit,
+            total: count || 0,
+            totalPages: Math.ceil((count || 0) / limit)
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error', error: error.message });
