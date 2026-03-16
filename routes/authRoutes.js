@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { signup, login, googleLogin, signupUser } = require('../controllers/authController');
+const { signup, login, googleLogin, signupUser, getUsers } = require('../controllers/authController');
 const { forgotPassword, verifyResetToken } = require('../forgetPassword/forgetpassController');
 const { resetPassword } = require('../forgetPassword/resetPassword');
 
@@ -27,4 +27,5 @@ router.post('/google-simple', require('../controllers/authController').googleLog
 router.put('/update-profile', protect, upload.single('profileImage'), require('../controllers/authController').updateUserProfile);
 router.get('/profile', protect, require('../controllers/authController').getUserProfile);
 router.put('/update-profile-image', protect, upload.single('profileImage'), require('../controllers/authController').updateProfileImage);
+router.get('/users', protect, getUsers);
 module.exports = router;

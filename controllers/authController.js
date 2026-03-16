@@ -1117,6 +1117,48 @@ const getUserProfile = async (req, res) => {
     }
 };
 
+
+// @desc    Get users with pagination
+// @route   GET /api/users
+// @access  Private / Admin
+
+const getUsers = async (req, res) => {
+    try {
+
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 10;
+
+        const start = (page - 1) * limit;
+        const end = start + limit - 1;
+
+        // get users
+        const { data: users, count, error } = await supabase
+            .from("users")
+            .select("*, orders(products(name))", { count: "exact" })
+            .in('role', ['User', 'Student'])
+            .range(start, end)
+            .order("created_at", { ascending: false });
+
+        if (error) {
+            throw error;
+        }
+
+        res.status(200).json({
+            page,
+            limit,
+            totalUsers: count,
+            totalPages: Math.ceil(count / limit),
+            users
+        });
+
+    } catch (error) {
+        console.error("Pagination Error:", error);
+        res.status(500).json({
+            message: "Server Error",
+            error: error.message
+        });
+    }
+};
 // @desc    Update Profile Image
 // @route   PUT /api/auth/update-image
 // @access  Private
@@ -1196,4 +1238,5 @@ module.exports = {
     updateProfileImage,
     verifyOtp,
     sendOtp,
+    getUsers,
 };
