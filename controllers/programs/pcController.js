@@ -141,60 +141,79 @@ exports.subscribePC = async (req, res) => {
 
 
 exports.createSubscriptionOrder = async (req, res) => {
-
     try {
-
         const { plan_id } = req.body;
 
-        const { data: plan, error } = await supabase
-            .from("pc_subscription_plans") // Always fetch plans from pc_subscription_plans
+        if (!plan_id) {
+            return res.status(400).json({ error: "plan_id is required" });
+        }
+
+        const userId = req.user.id;
+
+        // 1️⃣ Get Plan
+        const { data: plan, error: planError } = await supabase
+            .from("pc_subscription_plans")
             .select("*")
             .eq("id", plan_id)
             .single();
 
+        if (planError || !plan) {
+            return res.status(404).json({ error: "Plan not found" });
+        }
 
+        // 🔥 3️⃣ Cleanup old pending orders (IMPORTANT)
+        await supabase
+            .from("pc_subscriptions")
+            .delete()
+            .eq("id", plan_id)
+            .in("payment_status", ["pending", "cancelled"]);
 
-
-        if (error) throw error;
-
-
+        // 4️⃣ Create new Razorpay order (ALWAYS NEW)
         const options = {
-            amount: plan.price * 100,
+            amount: Math.round(plan.price * 100),
             currency: "INR",
-            receipt: "pc_subscription_" + Date.now()
+            receipt: `pc_subscription_${Date.now()}`
         };
-        console.log("kkkk", options)
-        const order = await razorpay.orders.create(options);
 
-        // Insert pending subscription record
-        // Track pending transaction
-        const userId = req.user.id;
-        console.log("iiii", userId)
+        const order = await razorpay.orders.create(options);
+        console.log("-----", order)
+        // 5️⃣ Insert fresh pending record
         const { error: subError } = await supabase
             .from("pc_subscriptions")
             .insert({
                 user_id: userId,
-                id: plan_id,
+                id: plan.id,
                 razorpay_order_id: order.id,
-                status: "pending"
+                payment_status: "pending",
+                amount: plan.price
             });
-        console.log(":::::::::::::", subError)
-        if (subError) throw subError;
+        console.log("========", subError)
+        if (subError) {
+            console.error("Subscription insert failed:", subError);
+            return res.status(500).json({
+                error: "Failed to create subscription record"
+            });
+        }
 
-        console.log("order", order)
-        res.json({
-            message: "Order created",
+        // 6️⃣ Response
+        return res.json({
+            message: "Order created successfully",
             order,
             key: process.env.RAZORPAY_KEY,
             plan
         });
 
+    } catch (error) {
+        console.error("Create Order Error:", error);
 
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        return res.status(500).json({
+            error: "Order creation failed",
+            details: error.message
+        });
     }
-
 };
+
+
 exports.verifySubscriptionPayment = async (req, res) => {
 
     try {

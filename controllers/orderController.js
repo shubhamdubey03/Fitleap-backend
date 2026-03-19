@@ -115,7 +115,7 @@ const createProduct = async (req, res) => {
         const inputPrice = parseFloat(price);
         const inputGstPercent = parseFloat(gst_percent) || 0;
         const gst_amount = (inputPrice * inputGstPercent) / 100;
-        const net_price = inputPrice - gst_amount;
+        const net_price = inputPrice + gst_amount;
 
         console.log("Calculated Net Price:", net_price);
         console.log("Calculated GST Amount:", gst_amount);
