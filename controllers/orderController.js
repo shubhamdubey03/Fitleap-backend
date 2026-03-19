@@ -48,16 +48,15 @@ const createOrder = async (req, res) => {
             };
         });
         console.log("ordersData", ordersData);
-        const { data, error } = await supabase
-            .from("orders")
-            .insert(ordersData)
-            .select();
+        // const { data, error } = await supabase
+        //     .from("orders")
+        //     .insert(ordersData)
+        //     .select();
 
-        if (error) throw error;
+        // if (error) throw error;
 
         // 5️⃣ Send Final Response
         return res.status(201).json({
-            orders: data,
             cartTotal,
             walletUsed,
             finalPayable

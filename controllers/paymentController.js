@@ -129,6 +129,33 @@ const verifyPayment = async (req, res) => {
             .update({ status: "success" })
             .eq("razorpay_order_id", razorpay_order_id);
 
+        const { data: payment } = await supabase
+            .from("payments")
+            .select("*")
+            .eq("razorpay_order_id", razorpay_order_id)
+            .single();
+
+        const items = payment.items;
+
+        // 4️⃣ Order create
+        const ordersData = items.map(item => ({
+            user_id: payment.user_id,
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_price: item.price,
+            price: item.price * item.quantity,
+            wallet_used: payment.wallet_used,
+            total_price: payment.amount,
+            status: "paid",
+            address_id: payment.address_id,
+        }));
+
+        const { error: insertError } = await supabase
+            .from("orders")
+            .insert(ordersData);
+
+        if (insertError) throw insertError;
+
         // 🪙 WALLET DEDUCTION LOGIC
         // We fetch the order to see if 'use_coins' was intented
         const { data: order, error: orderError } = await supabase
