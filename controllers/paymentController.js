@@ -7,6 +7,8 @@ const { updateReward } = require('./reward/rewardController');
 const createPaymentOrder = async (req, res) => {
     try {
         const { order_id, amount } = req.body;
+        console.log("order_id", order_id);
+        console.log("amount", amount);
 
         const razorOrder = await razorpay.orders.create({
             amount: Math.round(amount * 100), // Amount in paise (multiply by 100) and MUST be an integer
@@ -105,6 +107,10 @@ const verifyPayment = async (req, res) => {
         } = req.body;
 
         if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+            if (orderId) {
+                await supabase.from("orders").delete().eq("id", orderId);
+                await supabase.from("payments").delete().eq("order_id", orderId);
+            }
             return res.status(400).json({ error: "Missing payment details" });
         }
 
@@ -135,26 +141,26 @@ const verifyPayment = async (req, res) => {
             .eq("razorpay_order_id", razorpay_order_id)
             .single();
 
-        const items = payment.items;
+        // const items = payment.items;
 
-        // 4️⃣ Order create
-        const ordersData = items.map(item => ({
-            user_id: payment.user_id,
-            product_id: item.product_id,
-            quantity: item.quantity,
-            unit_price: item.price,
-            price: item.price * item.quantity,
-            wallet_used: payment.wallet_used,
-            total_price: payment.amount,
-            status: "paid",
-            address_id: payment.address_id,
-        }));
+        // // 4️⃣ Order create
+        // const ordersData = items.map(item => ({
+        //     user_id: payment.user_id,
+        //     product_id: item.product_id,
+        //     quantity: item.quantity,
+        //     unit_price: item.price,
+        //     price: item.price * item.quantity,
+        //     wallet_used: payment.wallet_used,
+        //     total_price: payment.amount,
+        //     status: "paid",
+        //     address_id: payment.address_id,
+        // }));
 
-        const { error: insertError } = await supabase
-            .from("orders")
-            .insert(ordersData);
+        // const { error: insertError } = await supabase
+        //     .from("orders")
+        //     .insert(ordersData);
 
-        if (insertError) throw insertError;
+        // if (insertError) throw insertError;
 
         // 🪙 WALLET DEDUCTION LOGIC
         // We fetch the order to see if 'use_coins' was intented

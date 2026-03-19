@@ -52,7 +52,7 @@ const createOrder = async (req, res) => {
             .from("orders")
             .insert(ordersData)
             .select();
-
+        console.log("data", data);
         if (error) throw error;
 
         // 5️⃣ Send Final Response
