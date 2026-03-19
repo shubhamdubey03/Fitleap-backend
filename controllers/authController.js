@@ -860,7 +860,7 @@ const findOrCreateUser = async (name, email, picture) => {
     // 1. Optimize: Select only necessary fields
     let { data: user } = await supabase
         .from('users')
-        .select('id, name, email, role, profile_image, is_premium')
+        .select('id, name, email, role, profile_image, is_subscribed')
         .eq('email', email)
         .maybeSingle();
 
