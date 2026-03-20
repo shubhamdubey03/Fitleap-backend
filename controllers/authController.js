@@ -268,6 +268,12 @@ const signupUser = async (req, res) => {
             return res.status(400).json({ message: "Please add all fields, including countryCode" });
         }
 
+        // Name validation: Only alphabets and spaces allowed
+        const nameRegexValidation = /^[A-Za-z\s]+$/;
+        if (!nameRegexValidation.test(trimmedName)) {
+            return res.status(400).json({ message: "Name must only contain alphabets (no numbers or special characters allowed)" });
+        }
+
         // Email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(trimmedEmail)) {
@@ -278,8 +284,10 @@ const signupUser = async (req, res) => {
             return res.status(400).json({ message: "Please provide a valid mobile number" });
         }
 
-        if (trimmedPassword.length < 8) {
-            return res.status(400).json({ message: "Password must be at least 8 characters long" });
+        // Strong password regex: min 8 chars, 1 letter, 1 number, 1 special char
+        const strongPasswordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+        if (!strongPasswordRegex.test(trimmedPassword)) {
+            return res.status(400).json({ message: "Password must be at least 8 characters long and include alphabets, numbers, and special characters" });
         }
 
         // Check if user exists
@@ -623,6 +631,12 @@ const signup = async (req, res) => {
             return res.status(400).json({ message: 'All fields are required' });
         }
 
+        // Name validation: Only alphabets and spaces allowed
+        const nameRegexValidation = /^[A-Za-z\s]+$/;
+        if (!nameRegexValidation.test(tName)) {
+            return res.status(400).json({ message: 'Name must only contain alphbets (no numbers or special characters allowed)' });
+        }
+
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(tEmail)) {
             return res.status(400).json({ message: 'Please provide a valid email address' });
@@ -632,8 +646,9 @@ const signup = async (req, res) => {
             return res.status(400).json({ message: 'Please provide a valid mobile number' });
         }
 
-        if (tPassword.length < 8) {
-            return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+        const strongPasswordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+        if (!strongPasswordRegex.test(tPassword)) {
+            return res.status(400).json({ message: 'Password must be at least 8 characters long and include alphabets, numbers, and special characters' });
         }
 
         // ✅ Safe email check (NO crash)
