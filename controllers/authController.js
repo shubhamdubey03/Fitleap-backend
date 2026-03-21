@@ -268,6 +268,10 @@ const signupUser = async (req, res) => {
             return res.status(400).json({ message: "Please add all fields, including countryCode" });
         }
 
+        if (userRole === "User" && (email_verified !== "true" && email_verified !== true)) {
+            return res.status(400).json({ message: "Please verify your email address before signing up." });
+        }
+
         // Name validation: Only alphabets and spaces allowed
         const nameRegexValidation = /^[A-Za-z\s]+$/;
         if (!nameRegexValidation.test(trimmedName)) {
@@ -393,7 +397,7 @@ const signupUser = async (req, res) => {
             console.log("tokenInsert", tokenInsert);
             console.log("tokenError", tokenError);
             console.log("OTP sent to", trimmedEmail);
-            await sendOtpEmail(trimmedEmail, otp, trimmedName);
+            sendOtpEmail(trimmedEmail, otp, trimmedName).catch(err => console.error("Failed to send OTP email:", err));
         }
 
         // Signup reward
@@ -586,14 +590,14 @@ const sendOtp = async (req, res) => {
                 }]);
 
             if (tokenError) throw tokenError;
-            await sendOtpEmail(trimmedEmail, otp, user.name);
+            sendOtpEmail(trimmedEmail, otp, user.name).catch(err => console.error("Failed to send OTP email during existing flow:", err));
         } else {
             // Pre-signup verification
             tempOtps.set(trimmedEmail, {
                 otp: otp,
                 expiry: Date.now() + 10 * 60 * 1000 // 10 minutes
             });
-            await sendOtpEmail(trimmedEmail, otp, 'User');
+            sendOtpEmail(trimmedEmail, otp, 'User').catch(err => console.error("Failed to send OTP email during pre-signup flow:", err));
         }
 
         res.status(200).json({ message: 'OTP sent successfully' });
@@ -846,11 +850,7 @@ const login = async (req, res) => {
 
             if (tokenError) throw tokenError;
 
-            try {
-                await sendOtpEmail(trimmedEmail, otp, user.name);
-            } catch (err) {
-                console.error("Failed to send OTP email:", err);
-            }
+            sendOtpEmail(trimmedEmail, otp, user.name).catch(err => console.error("Failed to send login OTP email:", err));
 
             return res.status(200).json({
                 message: 'OTP sent to your email for login verification.',
