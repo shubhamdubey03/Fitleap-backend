@@ -561,27 +561,40 @@ const generateOtp = () => {
 
 const sendOtp = async (req, res) => {
     try {
+        console.log("👉 API HIT: /send-otp");
+
         const { email } = req.body;
+        console.log("📩 Raw Email:", email);
+
         const trimmedEmail = email?.trim().toLowerCase();
+        console.log("📩 Trimmed Email:", trimmedEmail);
 
         if (!trimmedEmail) {
+            console.log("❌ Email missing");
             return res.status(400).json({ message: 'Email is required' });
         }
 
-        const otp = generateOtp(); // ✅ correct variable name
-        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min
+        const otp = generateOtp();
+        console.log("🔢 Generated OTP:", otp);
 
-        // 🔥 Sirf same email ka purana OTP delete karo
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+        console.log("⏳ Expiry Time:", expiresAt);
+
+        // 🔥 Delete old OTP
+        console.log("🧹 Deleting old OTP...");
         const { error: deleteError } = await supabase
             .from("email_otps")
             .delete()
             .eq("email", trimmedEmail);
 
         if (deleteError) {
-            console.error("Delete Error:", deleteError);
+            console.error("❌ Delete Error:", deleteError);
+        } else {
+            console.log("✅ Old OTP deleted");
         }
 
-        // 🔥 Naya OTP insert karo
+        // 🔥 Insert new OTP
+        console.log("💾 Inserting new OTP...");
         const { error: insertError } = await supabase
             .from("email_otps")
             .insert([{
@@ -592,16 +605,24 @@ const sendOtp = async (req, res) => {
             }]);
 
         if (insertError) {
+            console.error("❌ Insert Error:", insertError);
             return res.status(500).json({ error: insertError.message });
         }
 
-        // 🔥 Email send karo
-        await sendOtpEmail(trimmedEmail, otp, 'User');
+        console.log("✅ OTP inserted in DB");
+
+        // 🔥 Send email
+        console.log("📤 Sending email...");
+        const emailResponse = await sendOtpEmail(trimmedEmail, otp, 'User');
+
+        console.log("📬 Email Response:", emailResponse);
+
+        console.log("✅ OTP email sent successfully");
 
         return res.status(200).json({ message: "OTP sent successfully" });
 
     } catch (err) {
-        console.error("Send OTP Error:", err);
+        console.error("🔥 Send OTP Error:", err);
         return res.status(500).json({ message: "Server error" });
     }
 };
