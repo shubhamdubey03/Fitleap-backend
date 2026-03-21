@@ -555,6 +555,10 @@ const verifyOtp = async (req, res) => {
     }
 };
 
+const generateOtp = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
 const sendOtp = async (req, res) => {
     try {
         const { email } = req.body;
@@ -564,51 +568,80 @@ const sendOtp = async (req, res) => {
             return res.status(400).json({ message: 'Email is required' });
         }
 
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = generateOtp(); // ✅ correct variable name
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min
 
-        const { data: user } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', trimmedEmail)
-            .maybeSingle();
-        console.log("======", data)
-        if (user) {
-            // For existing user (EDU signup or forgot pass)
-            await supabase
-                .from('user_tokens')
-                .delete()
-                .eq('user_id', user.id)
-                .eq('token_type', 'email_verify');
+        // 🔥 Sirf same email ka purana OTP delete karo
+        const { error: deleteError } = await supabase
+            .from("email_otps")
+            .delete()
+            .eq("email", trimmedEmail);
 
-            const { error: tokenError } = await supabase
-                .from('user_tokens')
-                .insert([{
-                    user_id: user.id,
-                    token: otp,
-                    token_type: 'email_verify',
-                    created_at: new Date().toISOString()
-                }]);
-
-            if (tokenError) throw tokenError;
-            await sendOtpEmail(trimmedEmail, otp, user.name);
-        } else {
-            // Pre-signup verification
-            tempOtps.set(trimmedEmail, {
-                otp: otp,
-                expiry: Date.now() + 10 * 60 * 1000 // 10 minutes
-            });
-            await sendOtpEmail(trimmedEmail, otp, 'User');
+        if (deleteError) {
+            console.error("Delete Error:", deleteError);
         }
 
-        res.status(200).json({ message: 'OTP sent successfully' });
+        // 🔥 Naya OTP insert karo
+        const { error: insertError } = await supabase
+            .from("email_otps")
+            .insert([{
+                email: trimmedEmail,
+                otp: otp,
+                expires_at: expiresAt,
+                is_verified: false
+            }]);
 
-    } catch (error) {
-        console.error("Send OTP Error:", error);
-        res.status(500).json({ message: 'Server Error', error: error.message });
+        if (insertError) {
+            return res.status(500).json({ error: insertError.message });
+        }
+
+        // 🔥 Email send karo
+        await sendOtpEmail(trimmedEmail, otp, 'User');
+
+        return res.status(200).json({ message: "OTP sent successfully" });
+
+    } catch (err) {
+        console.error("Send OTP Error:", err);
+        return res.status(500).json({ message: "Server error" });
     }
 };
 
+const verifyOtps = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        const trimmedEmail = email?.trim().toLowerCase();
 
+        if (!trimmedEmail || !otp) {
+            return res.status(400).json({ message: "Email and OTP required" });
+        }
+
+        // 🔍 OTP check karo
+        const { data, error } = await supabase
+            .from("email_otps")
+            .select("*")
+            .eq("email", trimmedEmail)
+            .eq("otp", otp)
+            .eq("is_verified", false)
+            .gt("expires_at", new Date().toISOString())
+            .single();
+
+        if (error || !data) {
+            return res.status(400).json({ message: "Invalid or expired OTP" });
+        }
+
+        // ✅ mark verified
+        await supabase
+            .from("email_otps")
+            .update({ is_verified: true })
+            .eq("id", data.id);
+
+        return res.status(200).json({ message: "OTP verified successfully" });
+
+    } catch (err) {
+        console.error("Verify OTP Error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+};
 
 // @desc    Register a new coach/vendor
 // @route   POST /api/auth/signup
@@ -1265,6 +1298,7 @@ module.exports = {
     getUserProfile,
     updateProfileImage,
     verifyOtp,
+    verifyOtps,
     sendOtp,
     getUsers,
 };
