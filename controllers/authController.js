@@ -247,7 +247,7 @@ const getUniqueReferralCode = async () => {
 // };
 const signupUser = async (req, res) => {
     try {
-        const { name, email, password, mobile, countryCode, referralByCode, role } = req.body;
+        const { name, email, password, mobile, countryCode, referralByCode, role, email_verified } = req.body;
 
         const normalizedRole = role?.trim().toLowerCase();
 
@@ -353,7 +353,8 @@ const signupUser = async (req, res) => {
                     role: userRole,
                     referral_code: referralCode,
                     wallet_balance: 0,
-                    is_active,
+                    is_active: email_verified === "true" || email_verified === true ? true : is_active,
+                    email_verified: email_verified === "true" || email_verified === true,
                     id_proof_image,
                 },
             ])
@@ -368,11 +369,11 @@ const signupUser = async (req, res) => {
             });
         }
 
-        // Send OTP if EDU student
+        // Send OTP if EDU student and NOT VERIFIED
         // OTP for EDU
         let otp = null;
 
-        if (isEduEmail && (userRole === "Student" || userRole === "College Student")) {
+        if (isEduEmail && (userRole === "Student" || userRole === "College Student") && !(email_verified === "true" || email_verified === true)) {
             otp = Math.floor(100000 + Math.random() * 900000).toString();
             await supabase
                 .from("user_tokens")
@@ -430,7 +431,7 @@ const signupUser = async (req, res) => {
             // EDU student OTP
             if (
                 (user.role === "Student" || user.role === "College Student") &&
-                isEduEmail
+                isEduEmail && !(email_verified === "true" || email_verified === true)
             ) {
                 return res.status(201).json({
                     message: "OTP sent to your .edu email. Please verify.",
@@ -475,6 +476,8 @@ const signupUser = async (req, res) => {
         });
     }
 };
+const tempOtps = new Map();
+
 const verifyOtp = async (req, res) => {
     try {
         const { email, otp } = req.body;
@@ -486,60 +489,61 @@ const verifyOtp = async (req, res) => {
             return res.status(400).json({ message: "Email and OTP required" });
         }
 
-        // Find user
+        // Check if user exists (for existing flows like forgot password or EDU signup)
         const { data: user } = await supabase
             .from("users")
             .select("*")
             .eq("email", trimmedEmail)
             .maybeSingle();
 
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
+        if (user) {
+            // Existing user flow
+            const { data: tokenData } = await supabase
+                .from("user_tokens")
+                .select("*")
+                .eq("user_id", user.id)
+                .eq("token", otp)
+                .eq("token_type", "email_verify")
+                .maybeSingle();
+
+            if (!tokenData) {
+                return res.status(400).json({ message: "Invalid OTP" });
+            }
+
+            // Verify user
+            await supabase
+                .from("users")
+                .update({
+                    email_verified: true,
+                    is_active: true
+                })
+                .eq("id", user.id);
+
+            // delete OTP after use
+            await supabase
+                .from("user_tokens")
+                .delete()
+                .eq("id", tokenData.id);
+
+            return res.status(200).json({
+                message: "Email verified successfully",
+                _id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                token: generateToken(user.id)
+            });
+        } else {
+            // New user (pre-signup) flow
+            const storedOtp = tempOtps.get(trimmedEmail);
+            if (storedOtp && storedOtp.otp === otp) {
+                // OTP is valid
+                tempOtps.delete(trimmedEmail); // One-time use
+                return res.status(200).json({ message: "Email verified successfully" });
+            } else {
+                return res.status(400).json({ message: "Invalid or expired OTP" });
+            }
         }
-        console.log("useraaaaaaaaaaaa", user);
-        // Find OTP token
-        const { data: tokenData } = await supabase
-            .from("user_tokens")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("token", otp)
-            .eq("token_type", "email_verify")
-            .maybeSingle();
-        console.log("tokenDataaaaaaaaaaaaa", tokenData);
-        if (!tokenData) {
-            return res.status(400).json({ message: "Invalid OTP" });
-        }
-
-        // Check expiry (10 minutes example)
-        // const expired = dayjs().diff(dayjs(tokenData.created_at), "minute") > 10;
-
-        // if (expired) {
-        //     return res.status(400).json({ message: "OTP expired" });
-        // }
-
-        // Verify user
-        await supabase
-            .from("users")
-            .update({
-                email_verified: true,
-                is_active: true
-            })
-            .eq("id", user.id);
-
-        // delete OTP after use
-        await supabase
-            .from("user_tokens")
-            .delete()
-            .eq("id", tokenData.id);
-
-        res.status(200).json({
-            message: "Email verified successfully",
-            _id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            token: generateToken(user.id)
-        });
 
     } catch (error) {
         console.error("Verify OTP Error:", error);
@@ -556,38 +560,41 @@ const sendOtp = async (req, res) => {
             return res.status(400).json({ message: 'Email is required' });
         }
 
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
         const { data: user } = await supabase
             .from('users')
             .select('*')
             .eq('email', trimmedEmail)
             .maybeSingle();
 
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+        if (user) {
+            // For existing user (EDU signup or forgot pass)
+            await supabase
+                .from('user_tokens')
+                .delete()
+                .eq('user_id', user.id)
+                .eq('token_type', 'email_verify');
+
+            const { error: tokenError } = await supabase
+                .from('user_tokens')
+                .insert([{
+                    user_id: user.id,
+                    token: otp,
+                    token_type: 'email_verify',
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (tokenError) throw tokenError;
+            await sendOtpEmail(trimmedEmail, otp, user.name);
+        } else {
+            // Pre-signup verification
+            tempOtps.set(trimmedEmail, {
+                otp: otp,
+                expiry: Date.now() + 10 * 60 * 1000 // 10 minutes
+            });
+            await sendOtpEmail(trimmedEmail, otp, 'User');
         }
-
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-        // Delete any existing verification tokens for this user
-        await supabase
-            .from('user_tokens')
-            .delete()
-            .eq('user_id', user.id)
-            .eq('token_type', 'email_verify');
-
-        // Insert new token
-        const { error: tokenError } = await supabase
-            .from('user_tokens')
-            .insert([{
-                user_id: user.id,
-                token: otp,
-                token_type: 'email_verify',
-                created_at: new Date().toISOString()
-            }]);
-
-        if (tokenError) throw tokenError;
-
-        await sendOtpEmail(trimmedEmail, otp, user.name);
 
         res.status(200).json({ message: 'OTP sent successfully' });
 
@@ -616,6 +623,7 @@ const signup = async (req, res) => {
             bankName,
             bankAccNo,
             ifscCode,
+            email_verified,
         } = req.body;
 
         // Trim and Validate
@@ -704,6 +712,7 @@ const signup = async (req, res) => {
                 phone: tMobile,
                 country_code: countryCode,
                 role: 'Coach',
+                email_verified: email_verified === "true" || email_verified === true,
             }])
             .select()
             .single();
