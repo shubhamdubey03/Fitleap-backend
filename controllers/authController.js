@@ -571,7 +571,7 @@ const sendOtp = async (req, res) => {
             .select('*')
             .eq('email', trimmedEmail)
             .maybeSingle();
-
+        console.log("======", data)
         if (user) {
             // For existing user (EDU signup or forgot pass)
             await supabase
