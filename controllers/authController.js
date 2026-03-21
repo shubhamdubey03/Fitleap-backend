@@ -397,7 +397,7 @@ const signupUser = async (req, res) => {
             console.log("tokenInsert", tokenInsert);
             console.log("tokenError", tokenError);
             console.log("OTP sent to", trimmedEmail);
-            sendOtpEmail(trimmedEmail, otp, trimmedName).catch(err => console.error("Failed to send OTP email:", err));
+            await sendOtpEmail(trimmedEmail, otp, trimmedName);
         }
 
         // Signup reward
@@ -590,14 +590,14 @@ const sendOtp = async (req, res) => {
                 }]);
 
             if (tokenError) throw tokenError;
-            sendOtpEmail(trimmedEmail, otp, user.name).catch(err => console.error("Failed to send OTP email during existing flow:", err));
+            await sendOtpEmail(trimmedEmail, otp, user.name);
         } else {
             // Pre-signup verification
             tempOtps.set(trimmedEmail, {
                 otp: otp,
                 expiry: Date.now() + 10 * 60 * 1000 // 10 minutes
             });
-            sendOtpEmail(trimmedEmail, otp, 'User').catch(err => console.error("Failed to send OTP email during pre-signup flow:", err));
+            await sendOtpEmail(trimmedEmail, otp, 'User');
         }
 
         res.status(200).json({ message: 'OTP sent successfully' });
@@ -850,7 +850,11 @@ const login = async (req, res) => {
 
             if (tokenError) throw tokenError;
 
-            sendOtpEmail(trimmedEmail, otp, user.name).catch(err => console.error("Failed to send login OTP email:", err));
+            try {
+                await sendOtpEmail(trimmedEmail, otp, user.name);
+            } catch (err) {
+                console.error("Failed to send OTP email:", err);
+            }
 
             return res.status(200).json({
                 message: 'OTP sent to your email for login verification.',
