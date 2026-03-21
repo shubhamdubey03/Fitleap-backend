@@ -622,6 +622,9 @@ const sendOtp = async (req, res) => {
         return res.status(200).json({ message: "OTP sent successfully" });
 
     } catch (err) {
+        console.error("🔥 FULL ERROR:", err);
+        console.error("🔥 ERROR MESSAGE:", err.message);
+        console.error("🔥 STACK:", err.stack);
         console.error("🔥 Send OTP Error:", err);
         return res.status(500).json({ message: "Server error" });
     }
