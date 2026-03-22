@@ -1,6 +1,8 @@
 const transporter = require('../config/mailer');
 
 async function sendOtpEmail(to, otp, name) {
+  console.log("FROM:", process.env.MAIL_FROM_ADDRESS);
+  console.log("TO:", to); // ✅ ab defined hai
   await transporter.sendEmail({
     "From": process.env.MAIL_FROM_ADDRESS,
     "To": to,
@@ -24,6 +26,4 @@ async function sendOtpEmail(to, otp, name) {
     `
   });
 }
-console.log("FROM:", process.env.MAIL_FROM_ADDRESS);
-console.log("TO:", to);
 module.exports = sendOtpEmail;
