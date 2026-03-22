@@ -1,11 +1,11 @@
 const transporter = require('../config/mailer');
 
 async function sendOtpEmail(to, otp, name) {
-    await transporter.sendMail({
-        from: `"FitLeap" <${process.env.MAIL_FROM_ADDRESS}>`,
-        to,
-        subject: "Verify Your Email - FitLeap",
-        html: `
+  await transporter.sendEmail({
+    "From": process.env.MAIL_FROM_ADDRESS,
+    "To": to,
+    "Subject": "Verify Your Email - FitLeap",
+    "HtmlBody": `
       <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 10px;">
         <h2 style="color: #5a003c; text-align: center;">Verify Your Email 👋</h2>
         <p>Hello ${name || 'User'},</p>
@@ -22,7 +22,7 @@ async function sendOtpEmail(to, otp, name) {
         <p style="font-size: 10px; color: #aaa; text-align: center;">&copy; ${new Date().getFullYear()} FitLeap. All rights reserved.</p>
       </div>
     `
-    });
+  });
 }
 
 module.exports = sendOtpEmail;
