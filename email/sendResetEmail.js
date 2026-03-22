@@ -1,11 +1,11 @@
 const transporter = require('../config/mailer');
 
 async function sendResetEmail(to, resetLink, name) {
-    await transporter.sendMail({
-        from: `"FitLeap" <${process.env.MAIL_FROM_ADDRESS}>`,
-        to,
-        subject: "Reset Your Password - FitLeap",
-        html: `
+  await transporter.sendEmail({
+    "From": process.env.MAIL_FROM_ADDRESS,
+    "To": to,
+    "Subject": "Reset Your Password - FitLeap",
+    "HtmlBody": `
       <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
         <h2 style="color: #5a003c;">Hello ${name || 'User'}, 👋</h2>
         <p>You requested to reset your password for your FitLeap account.</p>
@@ -19,7 +19,7 @@ async function sendResetEmail(to, resetLink, name) {
         <p style="font-size: 12px; color: #888;">If you did not request a password reset, please ignore this email or contact support if you have concerns.</p>
       </div>
     `
-    });
+  });
 }
 
 module.exports = sendResetEmail;

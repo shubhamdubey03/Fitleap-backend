@@ -24,5 +24,6 @@ async function sendOtpEmail(to, otp, name) {
     `
   });
 }
-
+console.log("FROM:", process.env.MAIL_FROM_ADDRESS);
+console.log("TO:", to);
 module.exports = sendOtpEmail;
