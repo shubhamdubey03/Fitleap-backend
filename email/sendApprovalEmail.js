@@ -2,11 +2,11 @@ const transporter = require('../config/mailer');
 
 async function sendApprovalEmail(to, name, role) {
   try {
-    await transporter.sendEmail({
-      "From": process.env.MAIL_FROM_ADDRESS,
-      "To": to,
-      "Subject": "Your Account has been Approved! - FitLeap",
-      "HtmlBody": `
+    await transporter.emails.send({
+      from: process.env.MAIL_FROM_ADDRESS,
+      to: to,
+      subject: "Your Account has been Approved! - FitLeap",
+      htmlBody: `
           <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 10px;">
             <h2 style="color: #5a003c; text-align: center;">Account Approved! 🎉</h2>
             <p>Hello ${name || 'User'},</p>

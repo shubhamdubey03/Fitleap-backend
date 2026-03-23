@@ -3,11 +3,11 @@ const transporter = require('../config/mailer');
 async function sendOtpEmail(to, otp, name) {
   console.log("FROM:", process.env.MAIL_FROM_ADDRESS);
   console.log("TO:", to); // ✅ ab defined hai
-  await transporter.sendEmail({
-    "From": process.env.MAIL_FROM_ADDRESS,
-    "To": to,
-    "Subject": "Verify Your Email - FitLeap",
-    "HtmlBody": `
+  await transporter.emails.send({
+    from: process.env.MAIL_FROM_ADDRESS,
+    to: to,
+    subject: "Verify Your Email - FitLeap",
+    html: `
       <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 10px;">
         <h2 style="color: #5a003c; text-align: center;">Verify Your Email 👋</h2>
         <p>Hello ${name || 'User'},</p>

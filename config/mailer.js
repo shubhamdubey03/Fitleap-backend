@@ -13,8 +13,9 @@
 // module.exports = transporter;
 
 
-const postmark = require("postmark");
+// config/resend.js
+const { Resend } = require('resend');
 
-const transporter = new postmark.ServerClient(process.env.POSTMARK_API_KEY);
+const transporter = new Resend(process.env.RESEND_API_KEY);
 
 module.exports = transporter;

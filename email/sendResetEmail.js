@@ -1,11 +1,11 @@
 const transporter = require('../config/mailer');
 
 async function sendResetEmail(to, resetLink, name) {
-  await transporter.sendEmail({
-    "From": process.env.MAIL_FROM_ADDRESS,
-    "To": to,
-    "Subject": "Reset Your Password - FitLeap",
-    "HtmlBody": `
+  await transporter.emails.send({
+    from: process.env.MAIL_FROM_ADDRESS,
+    to: to,
+    subject: "Reset Your Password - FitLeap",
+    htmlBody: `
       <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
         <h2 style="color: #5a003c;">Hello ${name || 'User'}, 👋</h2>
         <p>You requested to reset your password for your FitLeap account.</p>

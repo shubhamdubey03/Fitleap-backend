@@ -1,11 +1,11 @@
 const transporter = require('../config/mailer');
 
 async function sendVendorEmail(to, password, name) {
-  await transporter.sendEmail({
-    "From": process.env.MAIL_FROM_ADDRESS,
-    "To": to,
-    "Subject": "Your Vendor Account Created",
-    "HtmlBody": `
+  await transporter.emails.send({
+    from: process.env.MAIL_FROM_ADDRESS,
+    to: to,
+    subject: "Your Vendor Account Created",
+    htmlBody: `
       <h3>Welcome ${name} 👋</h3>
       <p>Your vendor account has been created successfully.</p>
       <p><b>Email:</b> ${to}</p>
