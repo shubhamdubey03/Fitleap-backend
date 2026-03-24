@@ -16,6 +16,6 @@ router.get('/:id', protect, workoutController.getWorkoutById);
 router.put('/:workout_id', protect, workoutController.updateWorkoutTracker);
 
 // ✅ Delete Workout
-// router.delete('/:id', protect, workoutController.deleteWorkout);
+router.delete('/:id', protect, workoutController.deleteWorkout);
 
 module.exports = router;
