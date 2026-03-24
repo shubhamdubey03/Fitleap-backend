@@ -284,8 +284,13 @@ const signupUser = async (req, res) => {
             return res.status(400).json({ message: "Please provide a valid email address" });
         }
 
-        if (trimmedMobile.length < 10) {
-            return res.status(400).json({ message: "Please provide a valid mobile number" });
+        if (!trimmedEmail.endsWith('@gmail.com') && !trimmedEmail.endsWith('.edu')) {
+            return res.status(400).json({ message: "Only @gmail.com and .edu email addresses are allowed" });
+        }
+
+        const mobileRegex = /^[0-9]{10}$/;
+        if (!mobileRegex.test(trimmedMobile)) {
+            return res.status(400).json({ message: "Mobile number must be exactly 10 digits" });
         }
 
         // Strong password regex: min 8 chars, 1 letter, 1 number, 1 special char
@@ -700,10 +705,16 @@ const signup = async (req, res) => {
             return res.status(400).json({ message: 'All fields are required' });
         }
 
+        // Bank Name validation: Only alphabets and spaces allowed
+        const bankNameRegex = /^[A-Za-z\s]+$/;
+        if (!bankNameRegex.test(tBankName)) {
+            return res.status(400).json({ message: 'Bank Name must only contain alphabets' });
+        }
+
         // Name validation: Only alphabets and spaces allowed
         const nameRegexValidation = /^[A-Za-z\s]+$/;
         if (!nameRegexValidation.test(tName)) {
-            return res.status(400).json({ message: 'Name must only contain alphbets (no numbers or special characters allowed)' });
+            return res.status(400).json({ message: 'Name must only contain alphabets (no numbers or special characters allowed)' });
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -711,8 +722,13 @@ const signup = async (req, res) => {
             return res.status(400).json({ message: 'Please provide a valid email address' });
         }
 
-        if (tMobile.length < 10) {
-            return res.status(400).json({ message: 'Please provide a valid mobile number' });
+        if (!tEmail.endsWith('@gmail.com') && !tEmail.endsWith('.edu')) {
+            return res.status(400).json({ message: 'Only @gmail.com and .edu email addresses are allowed' });
+        }
+
+        const mobileRegex = /^[0-9]{10}$/;
+        if (!mobileRegex.test(tMobile)) {
+            return res.status(400).json({ message: 'Mobile number must be exactly 10 digits' });
         }
 
         const strongPasswordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
@@ -773,7 +789,6 @@ const signup = async (req, res) => {
                 phone: tMobile,
                 country_code: countryCode,
                 role: 'Coach',
-                email_verified: email_verified === "true" || email_verified === true,
             }])
             .select()
             .single();
