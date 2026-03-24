@@ -18,6 +18,10 @@ const getAllCoaches = async (req, res) => {
                 users:user_id!inner(name, email, phone, profile_image)
             `, { count: 'exact' });
 
+        if (req.query.is_approved !== undefined) {
+            query = query.eq('is_approved', req.query.is_approved === 'true');
+        }
+
         if (search) {
             query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`, { foreignTable: 'users' });
         }
@@ -47,12 +51,13 @@ const getAllCoaches = async (req, res) => {
 const approveCoach = async (req, res) => {
     try {
         const { id } = req.params; // coach table id
+        console.log("id", id)
 
         // check exists
         const { data: coach } = await supabase
             .from('coaches')
-            .select('user_id, is_approved')
-            .eq('user_id', id)
+            .select('id, is_approved')
+            .eq('id', id)
             .maybeSingle();
 
         if (!coach) {
@@ -67,7 +72,7 @@ const approveCoach = async (req, res) => {
         const { data, error } = await supabase
             .from('coaches')
             .update({ is_approved: true })
-            .eq('user_id', id)
+            .eq('id', id)
             .select()
             .single();
 
@@ -77,7 +82,7 @@ const approveCoach = async (req, res) => {
         const { data: coachUser } = await supabase
             .from('coaches')
             .select('user_id, users:user_id (name, email)')
-            .eq('user_id', id)
+            .eq('id', id)
             .single();
 
         if (coachUser && coachUser.users) {
@@ -186,35 +191,39 @@ const approveStudent = async (req, res) => {
 
 const rejectCoach = async (req, res) => {
     try {
-        const { id } = req.params; // coach table id
+        const { id } = req.params;
 
-        // Get user_id first to delete from users table too
-        const { data: coach } = await supabase
-            .from('users')
-            .select('id')
+        // ✅ Step 1: FIRST get user_id
+        const { data: coachData, error: coachError } = await supabase
+            .from('coaches')
+            .select('user_id')
             .eq('id', id)
-            .maybeSingle();
-        if (!coach) {
+            .single();
+
+        if (coachError || !coachData) {
             return res.status(404).json({ message: 'Coach not found' });
         }
 
-        // Delete from coaches table
+        const user_id = coachData.user_id;
+
+        // ✅ Step 2: delete coach
         const { error: coachDeleteError } = await supabase
             .from('coaches')
             .delete()
-            .eq('user_id', id);
+            .eq('id', id);
 
         if (coachDeleteError) throw coachDeleteError;
 
-        // Delete from users table
+        // ✅ Step 3: delete user
         const { error: userDeleteError } = await supabase
             .from('users')
             .delete()
-            .eq('id', id);
+            .eq('id', user_id);
 
         if (userDeleteError) throw userDeleteError;
 
-        res.json({ message: 'Coach request rejected and deleted' });
+        res.json({ message: 'Coach and user deleted successfully' });
+
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
