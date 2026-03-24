@@ -363,7 +363,7 @@ const signupUser = async (req, res) => {
                     referral_code: referralCode,
                     wallet_balance: 0,
                     is_active: email_verified === "true" || email_verified === true ? true : is_active,
-                    email_verified: email_verified === "true" || email_verified === true,
+                    // email_verified: email_verified === "true" || email_verified === true,
                     id_proof_image,
                 },
             ])
