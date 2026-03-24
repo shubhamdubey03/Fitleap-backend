@@ -1,5 +1,6 @@
 const supabase = require('../config/supabase');
 const sendApprovalEmail = require('../email/sendApprovalEmail');
+const { updateReward } = require('./reward/rewardController');
 
 // @desc    Get all Coaches
 // @route   GET /api/admin/coaches
@@ -175,6 +176,11 @@ const approveStudent = async (req, res) => {
         // Send email to student
         if (data && data.email) {
             await sendApprovalEmail(data.email, data.name, data.role || 'Student');
+        }
+
+        // Give signup reward coins
+        if (data && (data.role === 'Student' || data.role === 'College Student')) {
+            await updateReward(data.id, 'signup');
         }
 
         res.json({

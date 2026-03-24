@@ -405,8 +405,10 @@ const signupUser = async (req, res) => {
             await sendOtpEmail(trimmedEmail, otp, trimmedName);
         }
 
-        // Signup reward
-        await updateReward(user.id, "signup");
+        // Signup reward (Only for normal users; students get it upon admin approval or email verification)
+        if (userRole === "User") {
+            await updateReward(user.id, "signup");
+        }
 
         // Referral logic
         if (referralByCode) {
@@ -512,7 +514,7 @@ const verifyOtp = async (req, res) => {
                 .select("*")
                 .eq("user_id", user.id)
                 .eq("token", otp)
-                .eq("token_type", "email_verify")
+                .eq("token_type", "email_otp")
                 .maybeSingle();
 
             if (!tokenData) {
@@ -523,10 +525,14 @@ const verifyOtp = async (req, res) => {
             await supabase
                 .from("users")
                 .update({
-                    email_verified: true,
                     is_active: true
                 })
                 .eq("id", user.id);
+
+            // Give signup reward coins to Student/College Student upon email verification
+            if (user.role === "Student" || user.role === "College Student") {
+                await updateReward(user.id, "signup");
+            }
 
             // delete OTP after use
             await supabase
