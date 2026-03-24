@@ -18,6 +18,14 @@ const getAllCoaches = async (req, res) => {
                 users:user_id!inner(name, email, phone, profile_image)
             `, { count: 'exact' });
 
+        // Filter by is_requested=false/true if passed
+        if (req.query.is_approved === 'true') {
+            query = query.eq('is_approved', true);
+        } else if (req.query.is_approved === 'false') {
+            // Include both false and null to be safe for coaches who haven't been touched yet
+            query = query.or('is_approved.eq.false,is_approved.is.null');
+        }
+
         if (search) {
             query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`, { foreignTable: 'users' });
         }
@@ -25,6 +33,8 @@ const getAllCoaches = async (req, res) => {
         const { data, count, error } = await query
             .order('created_at', { ascending: false })
             .range(startIndex, startIndex + limit - 1);
+
+        console.log(`Backend Result: count=${count}, dataLength=${data?.length || 0}`);
 
         if (error) throw error;
 
@@ -124,18 +134,9 @@ const getStudentRequests = async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const startIndex = (page - 1) * limit;
 
-        // Get total count
-        const { count, error: countError } = await supabase
+        const { data, count, error } = await supabase
             .from('users')
-            .select('*', { count: 'exact', head: true })
-            .eq('role', 'Student')
-            .eq('is_active', false);
-
-        if (countError) throw countError;
-
-        const { data, error } = await supabase
-            .from('users')
-            .select('*')
+            .select('*', { count: 'exact' })
             .eq('role', 'Student')
             .eq('is_active', false)
             .order('created_at', { ascending: false })
