@@ -51,8 +51,8 @@ const approveCoach = async (req, res) => {
         // check exists
         const { data: coach } = await supabase
             .from('coaches')
-            .select('id, is_approved')
-            .eq('id', id)
+            .select('user_id, is_approved')
+            .eq('user_id', id)
             .maybeSingle();
 
         if (!coach) {
@@ -67,7 +67,7 @@ const approveCoach = async (req, res) => {
         const { data, error } = await supabase
             .from('coaches')
             .update({ is_approved: true })
-            .eq('id', id)
+            .eq('user_id', id)
             .select()
             .single();
 
@@ -77,7 +77,7 @@ const approveCoach = async (req, res) => {
         const { data: coachUser } = await supabase
             .from('coaches')
             .select('user_id, users:user_id (name, email)')
-            .eq('id', id)
+            .eq('user_id', id)
             .single();
 
         if (coachUser && coachUser.users) {
