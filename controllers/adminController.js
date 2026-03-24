@@ -18,10 +18,6 @@ const getAllCoaches = async (req, res) => {
                 users:user_id!inner(name, email, phone, profile_image)
             `, { count: 'exact' });
 
-        if (req.query.is_approved !== undefined) {
-            query = query.eq('is_approved', req.query.is_approved === 'true');
-        }
-
         if (search) {
             query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`, { foreignTable: 'users' });
         }
