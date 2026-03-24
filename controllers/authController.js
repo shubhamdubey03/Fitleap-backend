@@ -382,20 +382,20 @@ const signupUser = async (req, res) => {
         // OTP for EDU
         let otp = null;
 
-        if (isEduEmail && (userRole === "Student" || userRole === "College Student") && !(email_verified === "true" || email_verified === true)) {
+        if (isEduEmail && (userRole === "Student" || userRole === "College Student")) {
             otp = Math.floor(100000 + Math.random() * 900000).toString();
             await supabase
                 .from("user_tokens")
                 .delete()
                 .eq("user_id", user.id)
-                .eq("token_type", "email_verify");
+                .eq("token_type", "email_otp");
             console.log("user.id", user.id);
             console.log("otp", isEduEmail);
             const { data: tokenInsert, error: tokenError } = await supabase.from("user_tokens").insert([
                 {
                     user_id: user.id,
                     token: otp,
-                    token_type: "email_verify",
+                    token_type: "email_otp",
                     created_at: new Date().toISOString(),
                 },
             ]);
@@ -440,7 +440,7 @@ const signupUser = async (req, res) => {
             // EDU student OTP
             if (
                 (user.role === "Student" || user.role === "College Student") &&
-                isEduEmail && !(email_verified === "true" || email_verified === true)
+                isEduEmail
             ) {
                 return res.status(201).json({
                     message: "OTP sent to your .edu email. Please verify.",
