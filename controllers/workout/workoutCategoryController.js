@@ -52,3 +52,55 @@ exports.getCategories = async (req, res) => {
         return res.status(500).json({ error: err.message });
     }
 };
+
+exports.updateCategory = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, image } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ error: "Category name is required" });
+        }
+
+        const { data, error } = await supabase
+            .from('workout_categories')
+            .update({ name, image: image || null })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            return res.status(400).json({ error: error.message });
+        }
+
+        return res.status(200).json({
+            message: "Category updated successfully",
+            data
+        });
+
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+};
+
+exports.deleteCategory = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { error } = await supabase
+            .from('workout_categories')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            return res.status(400).json({ error: error.message });
+        }
+
+        return res.status(200).json({
+            message: "Category deleted successfully"
+        });
+
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+};
