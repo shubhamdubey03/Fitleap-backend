@@ -742,6 +742,18 @@ const signup = async (req, res) => {
             return res.status(400).json({ message: 'Password must be at least 8 characters long and include alphabets, numbers, and special characters' });
         }
 
+        // Bank Account Number validation: 9 to 18 digits
+        const bankAccNoRegex = /^\d{9,18}$/;
+        if (!bankAccNoRegex.test(tBankAccNo)) {
+            return res.status(400).json({ message: 'Bank Account Number must be between 9 and 18 digits' });
+        }
+
+        // IFSC Code validation: 4 letters, then 0, then 6 alphanumeric characters
+        const ifscCodeRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+        if (!ifscCodeRegex.test(tIfscCode)) {
+            return res.status(400).json({ message: 'Invalid IFSC Code format (e.g., SBIN0123456)' });
+        }
+
         // ✅ Safe email check (NO crash)
         const { data: existingUser } = await supabase
             .from('users')
