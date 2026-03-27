@@ -798,20 +798,20 @@ const signup = async (req, res) => {
             : null;
 
         // 👤 Create user
-        const { data: user, error: userErr } = await supabase
-            .from('users')
-            .insert([{
-                name: tName,
-                email: tEmail,
-                password: hashedPassword,
-                phone: tMobile,
-                country_code: countryCode,
-                role: 'Coach',
-            }])
-            .select()
-            .single();
-        console.log("User created successfulldddy", user);
-        if (userErr) throw userErr;
+        // const { data: user, error: userErr } = await supabase
+        //     .from('users')
+        //     .insert([{
+        //         name: tName,
+        //         email: tEmail,
+        //         password: hashedPassword,
+        //         phone: tMobile,
+        //         country_code: countryCode,
+        //         role: 'Coach',
+        //     }])
+        //     .select()
+        //     .single();
+        // console.log("User created successfulldddy", user);
+        // if (userErr) throw userErr;
 
         // 📋 Create coach profile (PENDING)
         const { error: coachErr } = await supabase

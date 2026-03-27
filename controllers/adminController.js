@@ -74,6 +74,21 @@ const approveCoach = async (req, res) => {
         if (coach.is_approved) {
             return res.json({ message: 'Coach already approved' });
         }
+        const { data: user, error: userErr } = await supabase
+            .from('users')
+            .insert([{
+                name: coach.name,
+                email: coach.email,
+                password: coach.password,
+                phone: coach.phone,
+                country_code: coach.country_code,
+                role: 'Coach'
+            }])
+            .select()
+            .single();
+
+        if (userErr) throw userErr;
+
 
         // approve
         const { data, error } = await supabase
