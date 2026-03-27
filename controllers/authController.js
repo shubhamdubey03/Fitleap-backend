@@ -1013,7 +1013,7 @@ const findOrCreateUser = async (name, email, picture) => {
             country_code: '+91',
             profile_image: picture // Save Google Profile Picture
         }])
-        .select('id, name, email, role, profile_image, is_premium')
+        .select('id, name, email, role, profile_image')
         .single();
 
     if (error) throw error;
@@ -1058,6 +1058,7 @@ const googleLogin = async (req, res) => {
         });
 
         const payload = ticket.getPayload();
+        console.log("0000", payload)
 
         console.log("✅ Google Payload:", {
             name: payload.name,
@@ -1089,22 +1090,22 @@ const googleLogin = async (req, res) => {
 // @desc    Google Login (Simple - Email & Name)
 // @route   POST /api/auth/google-simple
 // @access  Public
-const googleLoginSimple = async (req, res) => {
-    try {
-        const { email, name } = req.body;
+// const googleLoginSimple = async (req, res) => {
+//     try {
+//         const { email, name } = req.body;
 
-        if (!email || !name) {
-            return res.status(400).json({ message: 'Email and Name are required' });
-        }
+//         if (!email || !name) {
+//             return res.status(400).json({ message: 'Email and Name are required' });
+//         }
 
-        const user = await findOrCreateUser(name, email);
-        res.status(200).json({ ...user, token: generateToken(user.id) });
+//         const user = await findOrCreateUser(name, email);
+//         res.status(200).json({ ...user, token: generateToken(user.id) });
 
-    } catch (error) {
-        console.error("Google Simple Login Error:", error);
-        res.status(500).json({ message: 'Server Error', error: error.message });
-    }
-};
+//     } catch (error) {
+//         console.error("Google Simple Login Error:", error);
+//         res.status(500).json({ message: 'Server Error', error: error.message });
+//     }
+// };
 
 // @desc    Update User Profile
 // @route   PUT /api/auth/update-profile
@@ -1350,7 +1351,6 @@ module.exports = {
     signup,
     login,
     googleLogin,
-    googleLoginSimple,
     updateUserProfile,
     getUserProfile,
     updateProfileImage,

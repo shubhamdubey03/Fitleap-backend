@@ -24,7 +24,7 @@ router.post('/reset-password/:token', resetPassword);
 router.post('/verify-otp', require('../controllers/authController').verifyOtp);
 router.post('/verify-otps', require('../controllers/authController').verifyOtps);
 router.post('/send-otp', require('../controllers/authController').sendOtp);
-router.post('/google-simple', require('../controllers/authController').googleLoginSimple);
+// router.post('/google-simple', require('../controllers/authController').googleLoginSimple);
 router.put('/update-profile', protect, upload.single('profileImage'), require('../controllers/authController').updateUserProfile);
 router.get('/profile', protect, require('../controllers/authController').getUserProfile);
 router.put('/update-profile-image', protect, upload.single('profileImage'), require('../controllers/authController').updateProfileImage);
