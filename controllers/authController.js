@@ -711,6 +711,10 @@ const signup = async (req, res) => {
             return res.status(400).json({ message: 'All fields are required' });
         }
 
+        if (!req.files || !req.files.nutrition || !req.files.aadharCard || !req.files.panCard) {
+            return res.status(400).json({ message: 'Nutrition certificate, Aadhar Card, and PAN Card are required' });
+        }
+
         // Bank Name validation: Only alphabets and spaces allowed
         const bankNameRegex = /^[A-Za-z\s]+$/;
         if (!bankNameRegex.test(tBankName)) {
@@ -798,20 +802,20 @@ const signup = async (req, res) => {
             : null;
 
         // 👤 Create user
-        // const { data: user, error: userErr } = await supabase
-        //     .from('users')
-        //     .insert([{
-        //         name: tName,
-        //         email: tEmail,
-        //         password: hashedPassword,
-        //         phone: tMobile,
-        //         country_code: countryCode,
-        //         role: 'Coach',
-        //     }])
-        //     .select()
-        //     .single();
-        // console.log("User created successfulldddy", user);
-        // if (userErr) throw userErr;
+        const { data: user, error: userErr } = await supabase
+            .from('users')
+            .insert([{
+                name: tName,
+                email: tEmail,
+                password: hashedPassword,
+                phone: tMobile,
+                country_code: countryCode,
+                role: 'Coach',
+            }])
+            .select()
+            .single();
+        console.log("User created successfulldddy", user);
+        if (userErr) throw userErr;
 
         // 📋 Create coach profile (PENDING)
         const { error: coachErr } = await supabase
