@@ -945,7 +945,7 @@ const login = async (req, res) => {
             if (tokenError) throw tokenError;
 
             try {
-                await sendOtpEmail("aj257453@gmail.com", otp, user.name);
+                await sendOtpEmail(trimmedEmail, otp, user.name);
             } catch (err) {
                 console.error("Failed to send OTP email:", err);
             }
