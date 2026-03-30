@@ -930,7 +930,7 @@ const login = async (req, res) => {
                 .from('user_tokens')
                 .delete()
                 .eq('user_id', user.id)
-                .eq('token_type', 'email_verify');
+                .eq('token_type', 'email_otp');
 
             // Insert new token
             const { error: tokenError } = await supabase
@@ -938,7 +938,7 @@ const login = async (req, res) => {
                 .insert([{
                     user_id: user.id,
                     token: otp,
-                    token_type: 'email_verify',
+                    token_type: 'email_otp',
                     created_at: new Date().toISOString()
                 }]);
 
