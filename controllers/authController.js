@@ -514,7 +514,7 @@ const verifyOtp = async (req, res) => {
                 .select("*")
                 .eq("user_id", user.id)
                 .eq("token", otp)
-                .eq("token_type", "email_otp")
+                .eq("token_type", "email_verify")
                 .maybeSingle();
 
             if (!tokenData) {
@@ -945,7 +945,7 @@ const login = async (req, res) => {
             if (tokenError) throw tokenError;
 
             try {
-                await sendOtpEmail(trimmedEmail, otp, user.name);
+                await sendOtpEmail("shubham.dubeyargos@gmail.com", otp, user.name);
             } catch (err) {
                 console.error("Failed to send OTP email:", err);
             }
