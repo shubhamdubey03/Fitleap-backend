@@ -493,14 +493,36 @@ const verifyOtp = async (req, res) => {
     try {
         const { email, otp } = req.body;
 
-
         const trimmedEmail = email?.trim().toLowerCase();
 
         if (!trimmedEmail || !otp) {
             return res.status(400).json({ message: "Email and OTP required" });
         }
 
-        // Check if user exists (for existing flows like forgot password or EDU signup)
+        const currentTime = new Date().toISOString();
+
+        const { data, error } = await supabase
+            .from("email_otps")
+            .select("*")
+            .eq("email", trimmedEmail)
+            .eq("otp", String(otp))
+            .eq("is_verified", false)
+            .gt("expires_at", currentTime)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (!data) {
+            return res.status(400).json({ message: "Invalid or expired OTP" });
+        }
+
+        // ✅ mark verified
+        await supabase
+            .from("email_otps")
+            .update({ is_verified: true })
+            .eq("id", data.id);
+
+        // ✅ optional: user activate
         const { data: user } = await supabase
             .from("users")
             .select("*")
@@ -508,61 +530,24 @@ const verifyOtp = async (req, res) => {
             .maybeSingle();
 
         if (user) {
-            // Existing user flow
-            const { data: tokenData } = await supabase
-                .from("user_tokens")
-                .select("*")
-                .eq("user_id", user.id)
-                .eq("token", otp)
-                .eq("token_type", "email_verify")
-                .maybeSingle();
-
-            if (!tokenData) {
-                return res.status(400).json({ message: "Invalid OTP" });
-            }
-
-            // Verify user
             await supabase
                 .from("users")
-                .update({
-                    is_active: true
-                })
+                .update({ is_active: true })
                 .eq("id", user.id);
 
-            // Give signup reward coins to Student/College Student upon email verification
-            if (user.role === "Student" || user.role === "College Student") {
-                await updateReward(user.id, "signup");
-            }
-
-            // delete OTP after use
-            await supabase
-                .from("user_tokens")
-                .delete()
-                .eq("id", tokenData.id);
-
             return res.status(200).json({
-                message: "Email verified successfully",
-                _id: user.id,
-                email: user.email,
-                name: user.name,
-                role: user.role,
+                message: "OTP verified successfully",
                 token: generateToken(user.id)
             });
-        } else {
-            // New user (pre-signup) flow
-            const storedOtp = tempOtps.get(trimmedEmail);
-            if (storedOtp && storedOtp.otp === otp) {
-                // OTP is valid
-                tempOtps.delete(trimmedEmail); // One-time use
-                return res.status(200).json({ message: "Email verified successfully" });
-            } else {
-                return res.status(400).json({ message: "Invalid or expired OTP" });
-            }
         }
+
+        return res.status(200).json({
+            message: "OTP verified successfully"
+        });
 
     } catch (error) {
         console.error("Verify OTP Error:", error);
-        res.status(500).json({ message: "Server Error" });
+        return res.status(500).json({ message: "Server Error" });
     }
 };
 
@@ -572,71 +557,48 @@ const generateOtp = () => {
 
 const sendOtp = async (req, res) => {
     try {
-        console.log("👉 API HIT: /send-otp");
-
         const { email } = req.body;
-        console.log("📩 Raw Email:", email);
 
         const trimmedEmail = email?.trim().toLowerCase();
-        console.log("📩 Trimmed Email:", trimmedEmail);
 
         if (!trimmedEmail) {
-            console.log("❌ Email missing");
             return res.status(400).json({ message: 'Email is required' });
         }
 
         const otp = generateOtp();
-        console.log("🔢 Generated OTP:", otp);
-
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-        console.log("⏳ Expiry Time:", expiresAt);
 
-        // 🔥 Delete old OTP
-        console.log("🧹 Deleting old OTP...");
+        // ✅ delete old OTP
         const { error: deleteError } = await supabase
             .from("email_otps")
             .delete()
             .eq("email", trimmedEmail);
 
         if (deleteError) {
-            console.error("❌ Delete Error:", deleteError);
-        } else {
-            console.log("✅ Old OTP deleted");
+            console.error("Delete Error:", deleteError);
         }
 
-        // 🔥 Insert new OTP
-        console.log("💾 Inserting new OTP...");
+        // ✅ insert new OTP
         const { error: insertError } = await supabase
             .from("email_otps")
             .insert([{
                 email: trimmedEmail,
-                otp: otp,
-                expires_at: expiresAt,
+                otp: String(otp),
+                expires_at: expiresAt.toISOString(),
                 is_verified: false
             }]);
 
         if (insertError) {
-            console.error("❌ Insert Error:", insertError);
+            console.error("Insert Error:", insertError);
             return res.status(500).json({ error: insertError.message });
         }
 
-        console.log("✅ OTP inserted in DB");
-
-        // 🔥 Send email
-        console.log("📤 Sending email...");
-        const emailResponse = await sendOtpEmail(trimmedEmail, otp, 'User');
-
-        console.log("📬 Email Response:", emailResponse);
-
-        console.log("✅ OTP email sent successfully");
+        await sendOtpEmail(trimmedEmail, otp, 'User');
 
         return res.status(200).json({ message: "OTP sent successfully" });
 
     } catch (err) {
-        console.error("🔥 FULL ERROR:", err);
-        console.error("🔥 ERROR MESSAGE:", err.message);
-        console.error("🔥 STACK:", err.stack);
-        console.error("🔥 Send OTP Error:", err);
+        console.error("Send OTP Error:", err);
         return res.status(500).json({ message: "Server error" });
     }
 };
@@ -650,33 +612,57 @@ const verifyOtps = async (req, res) => {
             return res.status(400).json({ message: "Email and OTP required" });
         }
 
+
+        // ✅ Step 1: find user
+        const { data: user } = await supabase
+            .from("users")
+            .select("id")
+            .eq("email", trimmedEmail)
+            .maybeSingle();
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+
         // expires_at = now + 5 minutes
         const currentTime = new Date().toISOString();
 
         // 🔍 OTP check karo
         const { data, error } = await supabase
-            .from("email_otps")
+            .from("user_tokens")
             .select("*")
-            .eq("email", trimmedEmail)
-            .eq("otp", String(otp))
-            .eq("is_verified", false)
-            .gt("expires_at", new Date().toISOString())
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            .eq("user_id", user.id)
+            .eq("token", otp)
+            .eq("token_type", "email_verify")
+            .single();
         console.log(data, error)
 
         if (error || !data) {
             return res.status(400).json({ message: "Invalid or expired OTP" });
         }
 
-        // ✅ mark verified
+        // const createdTime = new Date(data.created_at).getTime();
+        // const now = Date.now();
+
+        // if (now - createdTime > 5 * 60 * 1000) {
+        //     return res.status(400).json({ message: "OTP expired" });
+        // }
+
         await supabase
-            .from("email_otps")
-            .update({ is_verified: true })
+            .from("user_tokens")
+            .delete()
             .eq("id", data.id);
 
-        return res.status(200).json({ message: "OTP verified successfully" });
+        // ✅ Step 5: activate user
+        await supabase
+            .from("users")
+            .update({ is_active: true })
+            .eq("id", user.id);
+
+        return res.status(200).json({
+            message: "OTP verified successfully"
+        });
 
     } catch (err) {
         console.error("Verify OTP Error:", err);
@@ -933,19 +919,20 @@ const login = async (req, res) => {
 
             // Delete any existing verification tokens for this user
             await supabase
-                .from('email_otps')
+                .from('user_tokens')
                 .delete()
-                .eq('email', trimmedEmail)
+                .eq('user_id', user.id)
+                .eq('token_type', 'email_verify')
 
-            const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+            // const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
             // Insert new token
             const { error: tokenError } = await supabase
-                .from('email_otps')
+                .from('user_tokens')
                 .insert([{
-                    email: trimmedEmail,
-                    otp: otp,
-                    expires_at: expiresAt.toISOString(),
+                    user_id: user.id,
+                    token: otp,
+                    token_type: 'email_verify',
                     created_at: new Date().toISOString()
                 }]);
             console.log(";;;;;;;", tokenError)
