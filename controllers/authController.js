@@ -492,7 +492,7 @@ const tempOtps = new Map();
 const verifyOtp = async (req, res) => {
     try {
         const { email, otp } = req.body;
-        console.log(email, otp);
+
 
         const trimmedEmail = email?.trim().toLowerCase();
 
@@ -645,20 +645,26 @@ const verifyOtps = async (req, res) => {
     try {
         const { email, otp } = req.body;
         const trimmedEmail = email?.trim().toLowerCase();
-
+        console.log(trimmedEmail, otp);
         if (!trimmedEmail || !otp) {
             return res.status(400).json({ message: "Email and OTP required" });
         }
+
+        // expires_at = now + 5 minutes
+        const currentTime = new Date().toISOString();
 
         // 🔍 OTP check karo
         const { data, error } = await supabase
             .from("email_otps")
             .select("*")
             .eq("email", trimmedEmail)
-            .eq("otp", otp)
+            .eq("otp", String(otp))
             .eq("is_verified", false)
             .gt("expires_at", new Date().toISOString())
-            .single();
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        console.log(data, error)
 
         if (error || !data) {
             return res.status(400).json({ message: "Invalid or expired OTP" });
@@ -927,21 +933,22 @@ const login = async (req, res) => {
 
             // Delete any existing verification tokens for this user
             await supabase
-                .from('user_tokens')
+                .from('email_otps')
                 .delete()
-                .eq('user_id', user.id)
-                .eq('token_type', 'email_otp');
+                .eq('email', trimmedEmail)
+
+            const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
             // Insert new token
             const { error: tokenError } = await supabase
-                .from('user_tokens')
+                .from('email_otps')
                 .insert([{
-                    user_id: user.id,
-                    token: otp,
-                    token_type: 'email_otp',
+                    email: trimmedEmail,
+                    otp: otp,
+                    expires_at: expiresAt.toISOString(),
                     created_at: new Date().toISOString()
                 }]);
-
+            console.log(";;;;;;;", tokenError)
             if (tokenError) throw tokenError;
 
             try {
