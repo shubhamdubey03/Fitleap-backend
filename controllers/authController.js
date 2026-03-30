@@ -661,7 +661,9 @@ const verifyOtps = async (req, res) => {
             .eq("id", user.id);
 
         return res.status(200).json({
-            message: "OTP verified successfully"
+            message: "OTP verified successfully",
+            token: generateToken(user.id),
+            role: user.role
         });
 
     } catch (err) {
