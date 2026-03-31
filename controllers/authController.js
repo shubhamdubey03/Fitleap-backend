@@ -264,12 +264,24 @@ const signupUser = async (req, res) => {
                     ? "College Student"
                     : "User";
 
+        const { data: otpData, error } = await supabase
+            .from("email_otps")
+            .select("is_verified")
+            .eq("email", email)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+
         if (!trimmedName || !trimmedEmail || !trimmedPassword || !trimmedMobile || !trimmedCountryCode) {
             return res.status(400).json({ message: "Please add all fields, including countryCode" });
         }
 
-        if (userRole === "User" && (email_verified !== "true" && email_verified !== true)) {
-            return res.status(400).json({ message: "Please verify your email address before signing up." });
+        if (userRole === "User") {
+            if (error || !otpData || otpData.is_verified !== true) {
+                return res.status(400).json({
+                    message: "Please verify your email address before signing up."
+                });
+            }
         }
 
         // Name validation: Only alphabets and spaces allowed
