@@ -12,6 +12,10 @@ exports.createPC = async (req, res) => {
             return res.status(403).json({ message: "Only admin can create program/challenge" });
         }
 
+        if (duration_days < 0 || reward_coins < 0) {
+            return res.status(400).json({ error: "duration_days and reward_coins cannot be negative" });
+        }
+
         const { data, error } = await supabase
             .from("programs_challenges")
             .insert({

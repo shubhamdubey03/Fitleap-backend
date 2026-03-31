@@ -10,7 +10,8 @@ exports.subscribe = async (req, res) => {
         const user_id = req.user.id;
         console.log("user_id", user_id)
 
-        if (!amount) return res.status(400).json({ error: "Amount required" });
+        if (!amount || amount <= 0) return res.status(400).json({ error: "Amount must be greater than 0" });
+        if (!months || months <= 0) return res.status(400).json({ error: "Duration (months) must be greater than 0" });
 
         let finalPlanId = plan_id || 'Monthly';
 
@@ -165,6 +166,10 @@ exports.createPlan = async (req, res) => {
     try {
         const { plan_name, price, duration_days, features, coach_id } = req.body;
 
+        if (price < 0 || duration_days < 0) {
+            return res.status(400).json({ success: false, error: "Price and duration_days cannot be negative" });
+        }
+
         const { data, error } = await supabase
             .from('coach_plans')
             .insert([{ plan_name, price, duration_days, features, coach_id }])
@@ -196,6 +201,13 @@ exports.updatePlan = async (req, res) => {
     try {
         const { id } = req.params;
         const { plan_name, price, duration_days, features, coach_id } = req.body;
+
+        if (price !== undefined && price < 0) {
+            return res.status(400).json({ success: false, error: "Price cannot be negative" });
+        }
+        if (duration_days !== undefined && duration_days < 0) {
+            return res.status(400).json({ success: false, error: "duration_days cannot be negative" });
+        }
 
         const { data, error } = await supabase
             .from('coach_plans')

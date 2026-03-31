@@ -12,6 +12,10 @@ exports.createPlan = async (req, res) => {
             });
         }
 
+        if (price < 0 || days < 0) {
+            return res.status(400).json({ error: "Price and days cannot be negative" });
+        }
+
         const { data, error } = await supabase
             .from("pc_subscription_plans")
             .insert([
@@ -66,6 +70,13 @@ exports.updatePlan = async (req, res) => {
             return res.status(403).json({
                 error: "Only admin can update plans"
             });
+        }
+
+        if (price !== undefined && price < 0) {
+            return res.status(400).json({ error: "Price cannot be negative" });
+        }
+        if (days !== undefined && days < 0) {
+            return res.status(400).json({ error: "days cannot be negative" });
         }
 
         const { data, error } = await supabase
