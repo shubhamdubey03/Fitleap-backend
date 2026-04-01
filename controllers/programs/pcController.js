@@ -55,8 +55,11 @@ exports.getProgramsChallenges = async (req, res) => {
 
         let query = supabase.from("programs_challenges").select("*");
 
-        if (!userSubStatus || !userSubStatus.pc_subscription) {
-            query = query.eq("is_free", true);
+        // Admins should see all. Users only see free ones if they don't have a subscription.
+        if (req.user.role !== 'admin') {
+            if (!userSubStatus || !userSubStatus.pc_subscription) {
+                query = query.eq("is_free", true);
+            }
         }
 
         const { data: programs, error } = await query;
