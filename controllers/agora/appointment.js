@@ -286,3 +286,51 @@ exports.completeAppointment = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+exports.getActiveStudents = async (req, res) => {
+    try {
+        const coach_id = req.user.id; // logged-in coach
+
+        // 🔹 Get active subscriptions with user details
+        const { data, error } = await supabase
+            .from('subscriptions')
+            .select(`
+                id,
+                start_date,
+                end_date,
+                user:user_id (
+                    id,
+                    name,
+                    email
+                )
+            `)
+            .eq('coach_id', coach_id)
+            .eq('status', 'active');
+
+        if (error) throw error;
+
+        // 🔹 Extract students
+        const students = data.map(item => ({
+            subscription_id: item.id,
+            start_date: item.start_date,
+            end_date: item.end_date,
+            ...item.user
+        }));
+        const uniqueStudents = Object.values(
+            students.reduce((acc, curr) => {
+                acc[curr.id] = curr;   // key = user id
+                return acc;
+            }, {})
+        );
+
+        res.json({
+            success: true,
+            total_students: uniqueStudents.length,
+            students: uniqueStudents
+        });
+
+    } catch (error) {
+        console.error("Get Active Students Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+};

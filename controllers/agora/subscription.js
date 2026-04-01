@@ -5,9 +5,10 @@ const crypto = require('crypto');
 
 exports.subscribe = async (req, res) => {
     try {
+        console.log("request.body", req.body)
         const { coach_id, months, amount, plan_id } = req.body; // coach_id can be null if it's a general platform sub
         const user_id = req.user.id;
-        console.log("user_id", user_id)
+        console.log("user_id", user_id, coach_id)
 
         if (!amount || amount <= 0) return res.status(400).json({ error: "Amount must be greater than 0" });
         if (!months || months <= 0) return res.status(400).json({ error: "Duration (months) must be greater than 0" });
@@ -187,7 +188,7 @@ exports.mySubscriptions = async (req, res) => {
         // 🔥 3. Fetch updated subscriptions
         const { data, error } = await supabase
             .from('subscriptions')
-            .select('*, coach:coach_id(id, name, profile_image)')
+            .select('*, coach:coach_id(*), plan:plan_id(plan_name, duration_days)')
             .eq('user_id', user_id)
             .order('created_at', { ascending: false });
 

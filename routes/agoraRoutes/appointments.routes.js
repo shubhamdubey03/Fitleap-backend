@@ -5,6 +5,7 @@ const ctrl = require('../../controllers/agora/appointment');
 router.post('/', protect, ctrl.book);
 router.get('/', protect, ctrl.myAppointments);
 router.get('/coaches/me/appointments', protect, ctrl.getCoachAppointments);
+router.get('/students/me/subscriptions', protect, ctrl.getActiveStudents);
 router.patch('/:id/accept', protect, ctrl.accept);
 router.patch('/:id/reject', protect, ctrl.reject);
 router.get('/:id', protect, ctrl.getOne);
