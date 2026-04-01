@@ -5,7 +5,6 @@ const crypto = require('crypto');
 
 exports.subscribe = async (req, res) => {
     try {
-        console.log("req.body", req.body)
         const { coach_id, months, amount, plan_id } = req.body; // coach_id can be null if it's a general platform sub
         const user_id = req.user.id;
         console.log("user_id", user_id)
@@ -169,13 +168,12 @@ exports.mySubscriptions = async (req, res) => {
             .from('subscriptions')
             .select('*')
             .eq('user_id', user_id)
-            .eq('status', 'upcoming')
+            .eq('payment_status', 'paid')
             .order('start_date', { ascending: true })
             .limit(1)
             .maybeSingle();
 
-        if (
-            nextSub &&
+        if (nextSub &&
             nextSub.start_date &&
             dayjs(nextSub.start_date).isSame(dayjs(), 'day') ||
             dayjs(nextSub.start_date).isBefore(dayjs())
