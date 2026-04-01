@@ -39,8 +39,7 @@ exports.book = async (req, res) => {
         .eq('user_id', user_id)
         .eq('coach_id', coach_id)
         .eq('status', 'active')
-        .single();
-
+    console.log("sub", sub);
     if (!sub) return res.status(400).json({ message: "No active subscription" });
 
     const { error } = await supabase
