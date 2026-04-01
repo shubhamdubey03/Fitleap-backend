@@ -77,7 +77,7 @@ exports.subscribe = async (req, res) => {
                 end_date: endDate,
                 plan_price: amount,
                 status: (lastSub && dayjs(lastSub.end_date).isAfter(dayjs()))
-                    ? 'upcoming'
+                    ? 'pending'
                     : 'active',
                 payment_status: 'pending',
                 razorpay_order_id: razorOrder.id,
