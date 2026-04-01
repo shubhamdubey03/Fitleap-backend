@@ -21,7 +21,7 @@ exports.addDiet = async (req, res) => {
             .eq("status", "active")
             .eq("payment_status", "paid")
             .gte("end_date", new Date().toISOString())
-            .maybeSingle();
+
         console.log("sub", sub);
         if (subError) throw subError;
 
