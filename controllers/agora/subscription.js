@@ -40,8 +40,32 @@ exports.subscribe = async (req, res) => {
             receipt: `sub_${Date.now()}`
         });
 
-        const start = dayjs().format('YYYY-MM-DD');
-        const end = dayjs().add(months, 'month').format('YYYY-MM-DD');
+        // 🔥 Get last subscription
+        const { data: lastSub } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', user_id)
+            .order('end_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        console.log("000000", lastSub)
+        // 🔥 Decide start date
+        let start;
+
+        if (lastSub && dayjs(lastSub.end_date).isAfter(dayjs())) {
+            // Active plan exists → queue
+            start = dayjs(lastSub.end_date);
+        } else {
+            // No active plan → start now
+            start = dayjs();
+        }
+
+        // 🔥 Calculate end date
+        const end = start.add(months, 'month');
+
+        // 🔥 Format
+        const startDate = start.format('YYYY-MM-DD');
+        const endDate = end.format('YYYY-MM-DD');
         console.log("0000000000", razorOrder)
         // 3. Insert into subscriptions
         const { data: subData, error: subError } = await supabase
@@ -49,10 +73,12 @@ exports.subscribe = async (req, res) => {
             .insert([{
                 user_id,
                 coach_id,
-                start_date: start,
-                end_date: end,
+                start_date: startDate,
+                end_date: endDate,
                 plan_price: amount,
-                status: 'pending',
+                status: (lastSub && dayjs(lastSub.end_date).isAfter(dayjs()))
+                    ? 'upcoming'
+                    : 'active',
                 payment_status: 'pending',
                 razorpay_order_id: razorOrder.id,
                 plan_id: finalPlanId
@@ -66,7 +92,10 @@ exports.subscribe = async (req, res) => {
             success: true,
             order: razorOrder,
             subscription_id: subData.id,
-            key: process.env.RAZORPAY_KEY
+            key: process.env.RAZORPAY_KEY,
+            start_date: startDate,
+            end_date: endDate,
+
         });
     } catch (error) {
         console.error("Subscription Error:", error);
@@ -121,18 +150,62 @@ exports.verifyPayment = async (req, res) => {
 };
 
 exports.mySubscriptions = async (req, res) => {
-    const user_id = req.user.id;
-    console.log("user_id", user_id)
-    const { data, error } = await supabase
-        .from('subscriptions')
-        .select('*, coach:coach_id(id, name,profile_image)')
-        .eq('user_id', user_id)
-        .order('created_at', { ascending: false });
-    console.log("datassssssssss", data);
-    if (error) return res.status(400).json({ error: error.message });
-    res.json(data);
-};
+    try {
+        const user_id = req.user.id;
+        console.log("user_id", user_id);
 
+        const today = dayjs().format('YYYY-MM-DD');
+
+        // 🔥 1. Expire old active plans
+        await supabase
+            .from('subscriptions')
+            .update({ status: 'expired' })
+            .eq('user_id', user_id)
+            .eq('status', 'active')
+            .lt('end_date', today);
+
+        // 🔥 2. Activate next upcoming plan (if its time has come)
+        const { data: nextSub } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', user_id)
+            .eq('status', 'upcoming')
+            .order('start_date', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+        if (
+            nextSub &&
+            nextSub.start_date &&
+            dayjs(nextSub.start_date).isSame(dayjs(), 'day') ||
+            dayjs(nextSub.start_date).isBefore(dayjs())
+        ) {
+            await supabase
+                .from('subscriptions')
+                .update({ status: 'active' })
+                .eq('id', nextSub.id);
+        }
+
+        // 🔥 3. Fetch updated subscriptions
+        const { data, error } = await supabase
+            .from('subscriptions')
+            .select('*, coach:coach_id(id, name, profile_image)')
+            .eq('user_id', user_id)
+            .order('created_at', { ascending: false });
+
+        console.log("datassssssssss", data);
+
+        if (error) {
+            return res.status(400).json({ error: error.message });
+        }
+
+        res.json(data);
+
+    } catch (error) {
+        console.error("Subscription Fetch Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
 exports.cancel = async (req, res) => {
     const user_id = req.user.id;
     const { id } = req.params;
@@ -237,3 +310,4 @@ exports.deletePlan = async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 };
+
