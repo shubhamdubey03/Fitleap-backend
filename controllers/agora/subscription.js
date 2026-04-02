@@ -174,17 +174,19 @@ exports.mySubscriptions = async (req, res) => {
             .limit(1)
             .maybeSingle();
 
-        if (nextSub &&
+        if (
+            nextSub &&
             nextSub.start_date &&
-            dayjs(nextSub.start_date).isSame(dayjs(), 'day') ||
-            dayjs(nextSub.start_date).isBefore(dayjs())
+            (
+                dayjs(nextSub.start_date).isSame(dayjs(), 'day') ||
+                dayjs(nextSub.start_date).isBefore(dayjs())
+            )
         ) {
             await supabase
                 .from('subscriptions')
                 .update({ status: 'active' })
                 .eq('id', nextSub.id);
         }
-
         // 🔥 3. Fetch updated subscriptions
         const { data, error } = await supabase
             .from('subscriptions')
