@@ -22,7 +22,7 @@ exports.sendMessage = async (req, res) => {
                     .eq("coach_id", chat.coach_id)
                     .eq("status", "active")
                     .gte("end_date", new Date().toISOString())
-                    .maybeSingle();
+                // .maybeSingle();
 
                 if (!sub) {
                     return res.status(403).json({

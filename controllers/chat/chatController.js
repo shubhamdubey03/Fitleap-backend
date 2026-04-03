@@ -29,7 +29,7 @@ exports.createOrGetChat = async (req, res) => {
             .eq("coach_id", coach_id)
             .eq("status", "active")
             .gte("end_date", dayjs().format('YYYY-MM-DD'))
-            .maybeSingle();
+        // .maybeSingle();
 
         if (subError) throw subError;
 
