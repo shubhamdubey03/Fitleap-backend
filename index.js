@@ -49,7 +49,6 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use('/api', locationRoutes);
 app.use('/api', stateRoutes);
-app.use('/api', require('./routes/userRoute/userRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/vendors', require('./routes/vendorRoute/vendorRoutes'));

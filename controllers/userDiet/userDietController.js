@@ -60,22 +60,36 @@ exports.addDiet = async (req, res) => {
 
 exports.getFreeDiets = async (req, res) => {
     try {
-        // Return all globally free diets (user_id is null) 
-        const { data, error } = await supabase
+        console.log("", res)
+
+        const { user_id } = req.params; // optional
+        console.log("user_id", user_id);
+        let query = supabase
             .from('user_diet')
-            .select('*')
+            .select('*')   // ✅ required
             .eq('is_free', true)
-            .is('user_id', null)
             .order('created_at', { ascending: false });
+
+        // ✅ Apply filter properly
+        if (user_id) {
+            query = query.or(`user_id.eq.${user_id},user_id.is.null`);
+        } else {
+            query = query.is('user_id', null);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
 
-        res.json({ success: true, data });
+        res.json({
+            success: true,
+            data
+        });
+
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
-
 exports.getUserDiet = async (req, res) => {
     try {
         const { user_id } = req.params;
