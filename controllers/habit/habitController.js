@@ -27,7 +27,6 @@ exports.createHabit = async (req, res) => {
 
         req.body.habit_id = data.id;
 
-        console.log("datawwwwwwwwwwwwwwwwwwwww", data)
         await reminderController.addReminder(req, res);
 
         // res.status(201).json({

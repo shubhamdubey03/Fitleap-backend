@@ -3,33 +3,32 @@ const supabase = require('../../config/supabase');
 exports.addDiet = async (req, res) => {
     try {
 
-        const { user_id, coach_id, food_name, food_type } = req.body;
-        console.log("user_id", user_id);
-        console.log("coach_id", coach_id);
-        console.log("food_name", food_name);
-        console.log("food_type", food_type);
+        const { user_id, coach_id, food_name, food_type, is_free } = req.body;
         if (!user_id || !coach_id || !food_name || !food_type) {
             return res.status(400).json({ message: "All fields required" });
         }
 
-        // Check for active subscription
-        const { data: sub, error: subError } = await supabase
-            .from("subscriptions")
-            .select("id")
-            .eq("user_id", user_id)
-            .eq("coach_id", coach_id)
-            .eq("status", "active")
-            .eq("payment_status", "paid")
-            .gte("end_date", new Date().toISOString())
+        if (!is_free) { // Only check for subscription if it's not a free diet
+            // Check for active subscription
+            const { data: sub, error: subError } = await supabase
+                .from("subscriptions")
+                .select("id")
+                .eq("user_id", user_id)
+                .eq("coach_id", coach_id)
+                .eq("status", "active")
+                .eq("payment_status", "paid")
+                .gte("end_date", new Date().toISOString())
+                .maybeSingle(); // Use maybeSingle to get null if no row found
 
-        console.log("sub", sub);
-        if (subError) throw subError;
+            console.log("sub", sub);
+            if (subError) throw subError;
 
-        if (!sub) {
-            return res.status(403).json({
-                success: false,
-                message: "User must have an active subscription with this coach to add a diet."
-            });
+            if (!sub) {
+                return res.status(403).json({
+                    success: false,
+                    message: "User must have an active subscription with this coach to add a non-free diet."
+                });
+            }
         }
 
         const { data, error } = await supabase
@@ -39,7 +38,8 @@ exports.addDiet = async (req, res) => {
                     user_id,
                     coach_id,
                     food_name,
-                    food_type
+                    food_type,
+                    is_free: is_free || false
                 }
             ])
             .select();
