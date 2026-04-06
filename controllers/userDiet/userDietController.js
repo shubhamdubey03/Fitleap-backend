@@ -4,14 +4,14 @@ exports.addDiet = async (req, res) => {
     try {
         const { user_id, coach_id, food_name, food_type, is_free } = req.body;
 
-        if (!coach_id || !food_name || !food_type) {
-            return res.status(400).json({ message: "coach_id, food_name and food_type are required" });
+        if (!food_name || !food_type) {
+            return res.status(400).json({ message: "food_name and food_type are required" });
         }
 
         // If not free, user_id is required AND subscription must be active
         if (!is_free) {
-            if (!user_id) {
-                return res.status(400).json({ message: "user_id is required for paid diets" });
+            if (!user_id || !coach_id) {
+                return res.status(400).json({ message: "user_id and coach_id are required for paid diets" });
             }
 
             const { data: sub, error: subError } = await supabase
@@ -60,7 +60,7 @@ exports.addDiet = async (req, res) => {
 
 exports.getFreeDiets = async (req, res) => {
     try {
-        console.log("", res)
+        console.log("", req.params)
 
         const { user_id } = req.params; // optional
         console.log("user_id", user_id);
