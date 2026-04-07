@@ -190,3 +190,64 @@ cron.schedule("30 * * * *", async () => {
     }
 
 });
+
+// 🔥 TEST MODE: Runs every minute
+// cron.schedule("0 8-22/2 * * *", async () => {
+cron.schedule("* * * * *", async () => {
+    console.log("⏰ [TEST] Running Water Intake Reminder Cron Job...");
+
+    try {
+        const { data: users, error } = await supabase
+            .from("users")
+            .select("id, fcm_token, name, water_reminder_enabled")
+            .eq("water_reminder_enabled", true)
+            .not("fcm_token", "is", null);
+
+        if (error) throw error;
+
+        if (!users || users.length === 0) {
+            console.log("⚠️ No users found with water reminders ENABLED.");
+            return;
+        }
+
+        console.log(`📡 Found ${users.length} users with water reminders enabled. Sending...`);
+
+        const title = "💧 Hydration Time!";
+        const body = "Time to drink some water and stay healthy!";
+
+        for (const user of users) {
+            // 1. Save notification to DB
+            await supabase
+                .from("notifications")
+                .insert({
+                    user_id: user.id,
+                    title,
+                    body,
+                    type: "broadcast",
+                    is_read: false
+                });
+
+            // 2. Send Push Notification via FCM
+            if (admin.apps.length && user.fcm_token) {
+                const message = {
+                    token: user.fcm_token,
+                    notification: { title, body },
+                    data: { type: "water_reminders" },
+                    android: {
+                        priority: "high",
+                        notification: { channelId: "water-reminder" }
+                    }
+                };
+
+                try {
+                    await admin.messaging().send(message);
+                } catch (fcmErr) {
+                    console.log(`FCM Error for ${user.id}:`, fcmErr.message);
+                }
+            }
+        }
+        console.log(`✅ Successfully processed hydration reminders for ${users.length} users`);
+    } catch (err) {
+        console.error("Water Intake Cron Error:", err.message);
+    }
+});

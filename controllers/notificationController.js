@@ -6,26 +6,31 @@ const admin = require('../config/firebase');
 // @access  Public
 const saveTokenAndNotify = async (req, res) => {
     try {
-        const { title, body, data, token, userId } = req.body;
+        const { title, body, data, token, userId, water_reminder_enabled } = req.body;
 
-        if (!token) {
-            return res.status(400).json({ message: 'Token is required' });
-        }
-
-        console.log(`Received token: ${token}`);
-
-        // 1. Update User with FCM Token (Optional if userId is provided)
+        // 1. Update User with FCM Token and Preferences
         if (userId) {
+            const updates = {};
+            if (token) updates.fcm_token = token;
+            if (water_reminder_enabled !== undefined) {
+                updates.water_reminder_enabled = water_reminder_enabled;
+            }
+
             const { error } = await supabase
                 .from('users')
-                .update({ fcm_token: token })
+                .update(updates)
                 .eq('id', userId);
 
             if (error) {
-                console.error('Error saving token to Supabase:', error);
+                console.error('Error saving preferences to Supabase:', error);
             } else {
-                console.log(`✅ Token saved to DB for user ${userId}`);
+                console.log(`✅ Preferences updated for user ${userId}`);
             }
+        }
+
+        if (!token) {
+            // If no token, we just update preferences and return
+            return res.status(200).json({ success: true, message: 'Preferences updated' });
         }
 
         if (!admin.apps.length) {
