@@ -223,7 +223,7 @@ cron.schedule("* * * * *", async () => {
                     user_id: user.id,
                     title,
                     body,
-                    type: "broadcast",
+                    type: "single",
                     is_read: false
                 });
 
