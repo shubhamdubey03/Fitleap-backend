@@ -91,7 +91,7 @@ cron.schedule("30 * * * *", async () => {
                     user_id: userId,
                     title,
                     body,
-                    type: "broadcast",
+                    type: "single",
                     data: { habit_id: habitId },
                     is_read: false
                 });
