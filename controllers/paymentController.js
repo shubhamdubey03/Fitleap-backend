@@ -262,10 +262,32 @@ const verifyPayment = async (req, res) => {
         const filePath = require('path').join(__dirname, '../invoices', fileName);
         await pdfGenerator(order, filePath);
 
-        console.log("File Path:", filePath);
+        console.log("File generated locally:", filePath);
 
-        const invoiceUrl = `${req.protocol}://${req.get('host')}/invoices/${fileName}`;
-        console.log("Invoice URL:", invoiceUrl);
+        // Upload directly to Supabase Storage (bypassing Render ephemeral deletion over time)
+        const fs = require('fs');
+        const fileBuffer = fs.readFileSync(filePath);
+
+        const { error: uploadError } = await supabase.storage
+            .from('invoices')
+            .upload(fileName, fileBuffer, {
+                contentType: 'application/pdf',
+                upsert: true
+            });
+
+        if (uploadError) {
+            console.error("Supabase Upload Error:", uploadError);
+            throw uploadError;
+        }
+
+        // Generate the permanent public URL
+        const { data: publicData } = supabase.storage.from('invoices').getPublicUrl(fileName);
+        const invoiceUrl = publicData.publicUrl;
+        
+        console.log("Permanent Supabase Invoice URL:", invoiceUrl);
+
+        // (Optional) Remove the temporary Render local file since it's uploaded
+        try { fs.unlinkSync(filePath); } catch (e) {}
 
         // ✅ Save invoice URL in orders table
         const { error: updateError } = await supabase
