@@ -260,12 +260,9 @@ const verifyPayment = async (req, res) => {
 
         const fileName = `invoice-${order.id}.pdf`;
         const filePath = require('path').join(__dirname, '../invoices', fileName);
-        await pdfGenerator(order, filePath);
-
-        console.log("File Path:", filePath);
-
-        const invoiceUrl = `${req.protocol}://${req.get('host')}/invoices/${fileName}`;
-        console.log("Invoice URL:", invoiceUrl);
+        // await pdfGenerator(order, filePath);
+        // const invoiceUrl = `${req.protocol}://${req.get('host')}/invoices/${fileName}`;
+        const invoiceUrl = await pdfGenerator(order);
 
         // ✅ Save invoice URL in orders table
         const { error: updateError } = await supabase

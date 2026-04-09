@@ -1,42 +1,61 @@
 const PDFDocument = require('pdfkit');
-const fs = require('fs');
-const path = require('path');
+const supabase = require('../config/supabase');
 
-async function pdfGenerator(order, filePath) {
-    console.log(";;;;;;;;;;", order)
-    console.log("PRODUCTS =>", order.product_id);
+async function pdfGenerator(order) {
     return new Promise((resolve, reject) => {
+        try {
+            const doc = new PDFDocument();
 
-        const dir = path.dirname(filePath);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+            const buffers = [];
+            doc.on('data', buffers.push.bind(buffers));
 
-        const doc = new PDFDocument();
-        const stream = fs.createWriteStream(filePath);
+            doc.on('end', async () => {
+                try {
+                    const pdfBuffer = Buffer.concat(buffers);
 
-        doc.pipe(stream);
+                    const fileName = `invoice-${order.id}.pdf`;
 
-        doc.fontSize(20).text("INVOICE", { align: "center" });
-        doc.moveDown();
+                    // 📤 Upload to Supabase Storage
+                    const { error } = await supabase.storage
+                        .from('invoices') // bucket name
+                        .upload(fileName, pdfBuffer, {
+                            contentType: 'application/pdf',
+                            upsert: true
+                        });
 
-        doc.text(`Order ID: ${order.id}`);
-        doc.text(`Date: ${new Date(order.created_at).toDateString()}`);
-        doc.moveDown();
+                    if (error) throw error;
 
-        doc.text(`Items: ${order.products.name}`);
+                    // 🔗 Get public URL
+                    const { data } = supabase.storage
+                        .from('invoices')
+                        .getPublicUrl(fileName);
 
-        // order.items.forEach(item => {
-        //     doc.text(`${item.product.name} x${item.qty} - ₹${item.price}`);
-        // });
+                    resolve(data.publicUrl);
 
-        doc.moveDown();
-        doc.text(`Total: ₹${order.total_price}`);
+                } catch (err) {
+                    reject(err);
+                }
+            });
 
-        doc.end();
+            // 🧾 PDF Content
+            doc.fontSize(20).text("INVOICE", { align: "center" });
+            doc.moveDown();
 
-        stream.on("finish", resolve);
-        stream.on("error", reject);
+            doc.text(`Order ID: ${order.id}`);
+            doc.text(`Date: ${new Date(order.created_at).toDateString()}`);
+            doc.moveDown();
+
+            doc.text(`Items: ${order.products.name}`);
+            doc.moveDown();
+
+            doc.text(`Total: ₹${order.total_price}`);
+
+            doc.end();
+
+        } catch (err) {
+            reject(err);
+        }
     });
 }
 
-
-module.exports = { pdfGenerator };   
+module.exports = { pdfGenerator };
