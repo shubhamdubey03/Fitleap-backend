@@ -166,16 +166,17 @@ const verifyPayment = async (req, res) => {
         // We fetch the order to see if 'use_coins' was intented
         const { data: order, error: orderError } = await supabase
             .from("orders")
-            .select(
-                'created_at',
-                `wallet_used, 
+            .select(`
+                created_at,
+                wallet_used, 
                 price, 
                 user_id, 
                 id, 
                 total_price, 
                 reward_given, 
                 product_id, 
-                products (id, name, price,gst_percent, description)`)
+                products (id, name, price, gst_percent, description)
+            `)
             .eq("id", orderId)
             .single();
 
