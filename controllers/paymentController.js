@@ -167,6 +167,7 @@ const verifyPayment = async (req, res) => {
         const { data: order, error: orderError } = await supabase
             .from("orders")
             .select(
+                'created_at',
                 `wallet_used, 
                 price, 
                 user_id, 
