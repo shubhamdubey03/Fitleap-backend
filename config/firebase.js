@@ -6,20 +6,36 @@ dotenv.config();
 
 let serviceAccount;
 
+// 1. Try to load from serviceAccountKey.json file
 try {
-    // Check if serviceAccountKey.json exists inside config or root
-    // Try root first
     const rootPath = path.join(__dirname, '../serviceAccountKey.json');
-    // Try creating a require call dynamically if needed, but path check is better
-    // Since this is node, require works
+    const localPath = path.join(__dirname, './serviceAccountKey.json');
+    
+    console.log(`[Firebase] Checking path: ${rootPath}`);
+    
     try {
         serviceAccount = require(rootPath);
+        console.log('✅ Found serviceAccountKey.json in root');
     } catch (e) {
-        // try config folder
-        serviceAccount = require('./serviceAccountKey.json');
+        console.log(`[Firebase] Root check failed, checking: ${localPath}`);
+        try {
+            serviceAccount = require(localPath);
+            console.log('✅ Found serviceAccountKey.json in config folder');
+        } catch (e2) {
+            console.log('❌ No serviceAccountKey.json file found in root or config');
+        }
     }
 } catch (error) {
-    console.warn('⚠️ serviceAccountKey.json not found. Notifications will not work unless configured.');
+    console.error('[Firebase] Unhandled error during file detection:', error.message);
+}
+
+// 2. Fallback: Try to load from FIREBASE_SERVICE_ACCOUNT Environment Variable (as a JSON string)
+if (!serviceAccount && process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } catch (parseError) {
+        console.error('❌ Error parsing FIREBASE_SERVICE_ACCOUNT env variable:', parseError.message);
+    }
 }
 
 if (serviceAccount) {
@@ -27,7 +43,7 @@ if (serviceAccount) {
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount)
         });
-        console.log('✅ Firebase Admin Initialized with serviceAccountKey.json');
+        console.log('✅ Firebase Admin Initialized Successfully');
     }
 } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     if (!admin.apps.length) {
@@ -37,7 +53,7 @@ if (serviceAccount) {
         console.log('✅ Firebase Admin Initialized via GOOGLE_APPLICATION_CREDENTIALS');
     }
 } else {
-    console.warn('⚠️ Firebase Admin NOT initialized. Please add serviceAccountKey.json');
+    console.error('❌ Firebase Admin NOT initialized. Please add serviceAccountKey.json OR FIREBASE_SERVICE_ACCOUNT environment variable.');
 }
 
 module.exports = admin;
